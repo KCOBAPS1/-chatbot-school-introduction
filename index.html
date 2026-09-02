@@ -100,7 +100,7 @@
       margin-bottom: 18px;
       padding: 12px;
     }
-    .avatar-container img {
+    .avatar-container img, .avatar-container svg {
       width: 100%;
       height: 100%;
       object-fit: contain;
@@ -226,8 +226,8 @@
 
     <div class="left-panel">
       <div class="panel-title">英皇書院同學會小學：余主任</div>
-      <div class="avatar-container">
-        <img src="avatar.png" alt="余主任">
+      <div class="avatar-container" id="avatar-box">
+        <img src="avatar.png" alt="余主任" onerror="handleAvatarError()">
       </div>
       
       <button class="btn-voice" onclick="startVoiceInput()">🎤 按此語音發問</button>
@@ -258,6 +258,37 @@
 
     const statusEl = document.getElementById('status');
     const badgeContainer = document.getElementById('audio-badge-container');
+
+    function handleAvatarError() {
+      const avatarBox = document.getElementById('avatar-box');
+      avatarBox.innerHTML = `
+        <svg viewBox="0 0 200 240" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background -->
+          <rect width="200" height="240" fill="#1a1e26"/>
+          <!-- Hair Back -->
+          <path d="M 60 75 Q 100 25 140 75 Z" fill="#2d2d2d"/>
+          <!-- Face -->
+          <ellipse cx="100" cy="95" rx="36" ry="42" fill="#ffd5b5"/>
+          <!-- Hair Front -->
+          <path d="M 62 72 C 75 50 125 50 138 72 C 120 62 80 62 62 72 Z" fill="#2d2d2d"/>
+          <!-- Eyes -->
+          <circle cx="86" cy="92" r="4" fill="#333"/>
+          <circle cx="114" cy="92" r="4" fill="#333"/>
+          <!-- Glasses -->
+          <rect x="74" y="83" width="24" height="18" rx="4" fill="none" stroke="#444" stroke-width="3"/>
+          <rect x="102" y="83" width="24" height="18" rx="4" fill="none" stroke="#444" stroke-width="3"/>
+          <line x1="98" y1="91" x2="102" y2="91" stroke="#444" stroke-width="3"/>
+          <!-- Smile -->
+          <path d="M 88 114 Q 100 124 112 114" fill="none" stroke="#e57373" stroke-width="3" stroke-linecap="round"/>
+          <!-- Shirt Collar -->
+          <polygon points="100,148 80,132 100,175 120,132" fill="#ffffff"/>
+          <!-- Tie -->
+          <polygon points="100,145 95,152 97,195 100,200 103,195 105,152" fill="#2b5278"/>
+          <!-- Sweater / Suit -->
+          <path d="M 45 240 Q 55 138 82 138 L 100 160 L 118 138 Q 145 138 155 240 Z" fill="#1f293d"/>
+        </svg>
+      `;
+    }
 
     function startApp() {
       document.getElementById('start-overlay').style.display = 'none';
