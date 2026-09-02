@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,27 @@ class ChatRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
+
+# Helper function to remove all URLs, Markdown links, and "Learn more" footers
+def clean_response(text: str) -> str:
+    if not text:
+        return ""
+    # Remove "Learn more:" section and everything following it
+    text = re.sub(r'---[\s\S]*$', '', text)
+    text = re.sub(r'(?i)learn\s+more:[\s\S]*$', '', text)
+    
+    # Convert Markdown links [Text](URL) into plain Text
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    
+    # Remove any raw URLs
+    text = re.sub(r'https?://\S+', '', text)
+    
+    # Clean up markdown extra symbols like **
+    text = text.replace('**', '').replace('__', '')
+    
+    # Clean up double line breaks and trim spaces
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return " ".join(lines)
 
 # Read school data from root repository file
 SCHOOL_INFO = ""
@@ -45,11 +67,12 @@ SYSTEM_PROMPT = {
     "content": (
         "你係英皇書院同學會小學嘅「余主任」。\n"
         "【嚴格規則】\n"
-        "1. 回答必須極之簡短、精確、重點明確（控制在 2 至 4 句以內），方便廣東話語音朗讀。\n"
-        "2. 如被問及學校網址，請只講出簡短域名「kcobaps1.edu.hk」。嚴禁輸出完整 `https://` 連結、Markdown 超連結或「Learn more」格式，避免語音朗讀出無關英文符號。\n"
-        "3. 你必須只回答與「英皇書院同學會小學」相關嘅問題（例如學校地址、特色、課程、升中資訊、校園生活）。\n"
-        "4. 如果問題與本校無關，禮貌地婉拒：「我係英小嘅余主任，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n"
-        "5. 請用親切、專業同禮貌嘅廣東話（繁體中文）回答。\n\n"
+        "1. 請像真人對話一樣回答，說話要親切自然，句子極之簡短（2 至 3 句以內）。\n"
+        "2. 絕對不要輸出任何網址、連結、Markdown 格式、參考來源或「Learn more」列表。\n"
+        "3. 如被問及學校網址，只說出「kcobaps1.edu.hk」。\n"
+        "4. 你只回答與「英皇書院同學會小學」相關嘅問題（例如學校地址、特色、課程、升中資訊、校園生活）。\n"
+        "5. 如果問題與本校無關，禮貌地婉拒：「我係英小嘅余主任，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n"
+        "6. 請用親切、專業同禮貌嘅廣東話（繁體中文）回答。\n\n"
         f"【學校官方參考資料】\n"
         f"學校官方網站：https://www.kcobaps1.edu.hk/\n"
         f"{SCHOOL_INFO if SCHOOL_INFO else '（請根據英皇書院同學會小學資料回答）'}"
@@ -89,8 +112,8 @@ async def chat(request: ChatRequest):
 
             if response.status_code == 200:
                 data = response.json()
-                reply_text = data["choices"][0]["message"]["content"]
-                return {"text": reply_text}
+                raw_text = data["choices"][0]["message"]["content"]
+                return {"text": clean_response(raw_text)}
 
             # 2. Fallback directly to OpenAI using gpt-4o-mini
             openai_response = await client.post(
@@ -108,8 +131,8 @@ async def chat(request: ChatRequest):
 
             if openai_response.status_code == 200:
                 data = openai_response.json()
-                reply_text = data["choices"][0]["message"]["content"]
-                return {"text": reply_text}
+                raw_text = data["choices"][0]["message"]["content"]
+                return {"text": clean_response(raw_text)}
 
             raise HTTPException(
                 status_code=response.status_code,
