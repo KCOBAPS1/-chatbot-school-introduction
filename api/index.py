@@ -21,7 +21,6 @@ class ChatRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: str
 
-# Read school context file from repository root
 SCHOOL_INFO = ""
 info_path = os.path.join(os.path.dirname(__file__), "..", "schoolintroduction")
 if os.path.exists(info_path):
