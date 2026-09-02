@@ -375,7 +375,7 @@
           };
 
           currentAudio.play().catch(e => {
-            console.warn("iOS Autoplay blocked:", e);
+            console.warn("Autoplay blocked:", e);
             statusEl.innerText = replyText;
             addQuestionToHistory(trimmedQuery, replyText);
             clearAudioBadge();
