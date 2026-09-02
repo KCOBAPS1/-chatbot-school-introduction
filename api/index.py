@@ -21,7 +21,7 @@ class ChatRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: str
 
-# 1. Multi-path file loader to ensure schoolintroduction is loaded correctly
+# Read school data from root repository file
 SCHOOL_INFO = ""
 possible_paths = [
     os.path.join(os.path.dirname(__file__), "..", "schoolintroduction.txt"),
@@ -36,23 +36,23 @@ for path in possible_paths:
             with open(path, "r", encoding="utf-8") as f:
                 SCHOOL_INFO = f.read().strip()
             if SCHOOL_INFO:
-                print(f"Successfully loaded school data from: {path}")
                 break
         except Exception as e:
             print(f"Error reading {path}: {e}")
 
-# 2. System prompt configured for short, link-free, precise responses
 SYSTEM_PROMPT = {
     "role": "system",
     "content": (
         "你係英皇書院同學會小學嘅「余主任」。\n"
         "【嚴格規則】\n"
         "1. 回答必須極之簡短、精確、重點明確（控制在 2 至 4 句以內），方便廣東話語音朗讀。\n"
-        "2. 嚴禁輸出任何網址、URL、Markdown 超連結、參考來源或「Learn more」字樣。\n"
+        "2. 如被問及學校網址，請只講出簡短域名「kcobaps1.edu.hk」。嚴禁輸出完整 `https://` 連結、Markdown 超連結或「Learn more」格式，避免語音朗讀出無關英文符號。\n"
         "3. 你必須只回答與「英皇書院同學會小學」相關嘅問題（例如學校地址、特色、課程、升中資訊、校園生活）。\n"
         "4. 如果問題與本校無關，禮貌地婉拒：「我係英小嘅余主任，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n"
         "5. 請用親切、專業同禮貌嘅廣東話（繁體中文）回答。\n\n"
-        f"【學校官方參考資料】\n{SCHOOL_INFO if SCHOOL_INFO else '（請根據英皇書院同學會小學資料回答）'}"
+        f"【學校官方參考資料】\n"
+        f"學校官方網站：https://www.kcobaps1.edu.hk/\n"
+        f"{SCHOOL_INFO if SCHOOL_INFO else '（請根據英皇書院同學會小學資料回答）'}"
     )
 }
 
@@ -73,7 +73,7 @@ async def chat(request: ChatRequest):
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Try Poe API
+            # 1. Try Poe API with custom bot handle
             response = await client.post(
                 "https://api.poe.com/v1/chat/completions",
                 headers={
@@ -92,7 +92,7 @@ async def chat(request: ChatRequest):
                 reply_text = data["choices"][0]["message"]["content"]
                 return {"text": reply_text}
 
-            # Fallback to OpenAI API
+            # 2. Fallback directly to OpenAI using gpt-4o-mini
             openai_response = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
