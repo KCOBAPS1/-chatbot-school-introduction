@@ -335,7 +335,7 @@
         }
 
         const replyText = chatData.text;
-        statusEl.innerText = "余主任準備緊廣東話語音...";
+        statusEl.innerText = "余主任準備緊回答，請稍候...";
 
         // 2. Fetch TTS Voice from Cantonese.ai
         let audioUrl = null;
@@ -357,7 +357,6 @@
             chatHistory.push({ role: "assistant", content: replyText });
           });
         } else {
-          // If Cantonese.ai fails or rate-limits, reveal text with an alert
           statusEl.innerText = replyText;
           addQuestionToHistory(trimmedQuery, replyText);
           chatHistory.push({ role: "assistant", content: replyText });
