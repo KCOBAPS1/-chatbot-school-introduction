@@ -264,19 +264,9 @@
 
       const welcomeText = "你好呀！我係英小嘅余主任。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
       statusEl.innerText = welcomeText;
-      showAudioBadge("播放語音中");
-
-      currentAudio.src = 'welcome.mp3';
-      currentAudio.play().then(() => {
-        chatHistory.push({ role: "assistant", content: welcomeText });
-      }).catch(e => {
-        console.warn("Autoplay blocked or welcome.mp3 missing:", e);
-        clearAudioBadge();
-      });
-
-      currentAudio.onended = () => {
-        clearAudioBadge();
-      };
+      
+      playAudioOrFallback(welcomeText, 'welcome.mp3');
+      chatHistory.push({ role: "assistant", content: welcomeText });
     }
 
     function showAudioBadge(text) {
@@ -321,7 +311,8 @@
       statusEl.innerText = "余主任解答緊，請稍候...";
       clearAudioBadge();
 
-      currentAudio.pause();
+      if (currentAudio) currentAudio.pause();
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
       chatHistory.push({ role: "user", content: trimmedQuery });
 
@@ -342,48 +333,24 @@
 
         const replyText = chatData.text;
 
-        if (replyText.includes("連線失敗") || replyText.includes("錯誤")) {
-          statusEl.innerText = replyText;
-          chatHistory.pop();
-          return;
-        }
-
-        statusEl.innerText = "余主任準備緊回答同語音...";
-        showAudioBadge("廣東話語音生成中...");
-
-        const ttsRes = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: replyText })
-        });
-
-        const ttsData = await ttsRes.json();
-
+        statusEl.innerText = replyText;
+        addQuestionToHistory(trimmedQuery, replyText);
         chatHistory.push({ role: "assistant", content: replyText });
 
-        if (ttsData.audio_url) {
-          currentAudio.src = ttsData.audio_url;
-          
-          currentAudio.onplay = () => {
-            statusEl.innerText = replyText;
-            addQuestionToHistory(trimmedQuery, replyText);
-            showAudioBadge("播放語音中");
-          };
+        showAudioBadge("廣東話語音朗讀中...");
 
-          currentAudio.onended = () => {
-            clearAudioBadge();
-          };
-
-          currentAudio.play().catch(e => {
-            console.warn("Autoplay blocked:", e);
-            statusEl.innerText = replyText;
-            addQuestionToHistory(trimmedQuery, replyText);
-            clearAudioBadge();
+        // Try backend TTS API
+        try {
+          const ttsRes = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: replyText })
           });
-        } else {
-          statusEl.innerText = replyText;
-          addQuestionToHistory(trimmedQuery, replyText);
-          clearAudioBadge();
+          const ttsData = await ttsRes.json();
+
+          playAudioOrFallback(replyText, ttsData.audio_url);
+        } catch (e) {
+          playAudioOrFallback(replyText, null);
         }
 
       } catch (error) {
@@ -398,6 +365,41 @@
           inputField.focus();
         }
       }
+    }
+
+    // Play Audio URL or Fallback to Browser Native Cantonese Speech
+    function playAudioOrFallback(text, audioUrl) {
+      if (audioUrl) {
+        currentAudio.src = audioUrl;
+        showAudioBadge("播放語音中");
+        currentAudio.play().then(() => {
+          currentAudio.onended = () => clearAudioBadge();
+        }).catch(e => {
+          console.warn("Audio file blocked or failed, using browser speech fallback:", e);
+          speakBrowserSpeech(text);
+        });
+      } else {
+        speakBrowserSpeech(text);
+      }
+    }
+
+    function speakBrowserSpeech(text) {
+      if (!('speechSynthesis' in window)) {
+        clearAudioBadge();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-HK';
+      utterance.rate = 1.0;
+
+      showAudioBadge("廣東話朗讀中");
+
+      utterance.onend = () => clearAudioBadge();
+      utterance.onerror = () => clearAudioBadge();
+
+      window.speechSynthesis.speak(utterance);
     }
 
     function startVoiceInput() {
