@@ -84,7 +84,7 @@ async def chat(request: ChatRequest):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "gpt-4o-mini",
+                    "model": "schoolchatbotyu",
                     "messages": formatted_messages,
                     "temperature": 0.3
                 }
