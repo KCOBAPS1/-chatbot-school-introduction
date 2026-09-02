@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>小學數學：余主任</title>
+  <title>英皇書院同學會小學：余主任</title>
   <style>
     * {
       box-sizing: border-box;
@@ -22,7 +22,6 @@
       padding: 20px;
     }
     
-    /* 放大整體容器尺寸 (適合 iPad & 桌面) */
     .app-container {
       display: flex;
       gap: 24px;
@@ -32,7 +31,6 @@
       position: relative;
     }
     
-    /* iPad 點擊解鎖遮罩 */
     .start-overlay {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -71,7 +69,6 @@
       transform: scale(0.96);
     }
 
-    /* 左右面板放大 */
     .left-panel, .right-panel {
       background-color: rgba(43, 49, 62, 0.94);
       border-radius: 16px;
@@ -171,7 +168,6 @@
       min-height: 50px;
     }
     
-    /* 狀態與字體加大 */
     .status-box {
       font-size: 16px;
       color: #e0e4ec;
@@ -198,7 +194,6 @@
       100% { opacity: 0.6; }
     }
 
-    /* 對話紀錄歷史框（字體加大至 16px，行距放寬） */
     .history-box {
       flex: 1;
       background-color: #1a1e26;
@@ -224,15 +219,13 @@
 <body>
 
   <div class="app-container">
-    <!-- iPad / Safari 首頁點擊解鎖音訊遮罩 -->
     <div id="start-overlay" class="start-overlay">
-      <h2>歡迎嚟到余主任嘅數學課堂！</h2>
-      <button class="btn-start" onclick="startApp()">🎓 開始課堂</button>
+      <h2>歡迎嚟到英皇書院同學會小学！</h2>
+      <button class="btn-start" onclick="startApp()">🏫 開始諮詢余主任</button>
     </div>
 
-    <!-- 左邊面板：頭像、輸入與語音按鈕 -->
     <div class="left-panel">
-      <div class="panel-title">小學數學：余主任</div>
+      <div class="panel-title">英皇書院同學會小學：余主任</div>
       <div class="avatar-container">
         <img src="avatar.png" alt="余主任">
       </div>
@@ -240,26 +233,25 @@
       <button class="btn-voice" onclick="startVoiceInput()">🎤 按此語音發問</button>
       
       <div class="input-row">
-        <input type="text" id="text-input" placeholder="向余主任提問..." onkeydown="if(event.key==='Enter') handleSend()">
+        <input type="text" id="text-input" placeholder="查詢學校特色、課程或升中資訊..." onkeydown="if(event.key==='Enter') handleSend()">
         <button class="send" onclick="handleSend()">傳送</button>
       </div>
       
       <div class="status-container">
-        <div id="status" class="status-box">余主任準備好回答問題。</div>
+        <div id="status" class="status-box">余主任準備好為你介紹英小。</div>
         <div id="audio-badge-container"></div>
       </div>
     </div>
 
-    <!-- 右邊面板：對話紀錄 -->
     <div class="right-panel">
-      <div class="panel-title">課堂探究紀錄</div>
+      <div class="panel-title">學校諮詢紀錄</div>
       <div id="chat-history" class="history-box">與余主任的對話紀錄會顯示在此處。</div>
     </div>
   </div>
 
   <script>
     let chatHistory = [];
-    let currentAudio = new Audio(); // 全局 Audio 物件，維護 iOS 播放權限
+    let currentAudio = new Audio();
     let recognition = null;
     let isRecording = false;
     let silenceTimer = null;
@@ -267,15 +259,14 @@
     const statusEl = document.getElementById('status');
     const badgeContainer = document.getElementById('audio-badge-container');
 
-    // 1. 學生按下「開始課堂」：解鎖 iPad 音訊並播放 welcome.mp3
     function startApp() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      const welcomeText = "你好呀！我係余主任。請問你叫咩名呀？";
+      const welcomeText = "你好呀！我係英小嘅余主任。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
       statusEl.innerText = welcomeText;
       showAudioBadge("播放語音中");
 
-      currentAudio.src = 'welcome.mp3'; // GitHub 根目錄的 welcome.mp3
+      currentAudio.src = 'welcome.mp3';
       currentAudio.play().then(() => {
         chatHistory.push({ role: "assistant", content: welcomeText });
       }).catch(e => {
@@ -296,7 +287,6 @@
       badgeContainer.innerHTML = '';
     }
 
-    // 2. 手動或自動傳送功能
     function handleSend() {
       const input = document.getElementById('text-input');
       const text = input.value.trim();
@@ -318,7 +308,6 @@
       historyBox.scrollTop = historyBox.scrollHeight;
     }
 
-    // 3. 後端 API 溝通與同頻呈現（文字 + 語音）
     async function sendQueryToBackend(studentQuery) {
       const trimmedQuery = studentQuery.trim();
       if (!trimmedQuery) return;
@@ -329,15 +318,14 @@
       if (sendBtn) sendBtn.disabled = true;
       if (inputField) inputField.disabled = true;
 
-      statusEl.innerText = "余主任思考緊，準備回答你...";
+      statusEl.innerText = "余主任解答緊，請稍候...";
       clearAudioBadge();
 
-      currentAudio.pause(); // 預先暫停舊語音
+      currentAudio.pause();
 
       chatHistory.push({ role: "user", content: trimmedQuery });
 
       try {
-        // Step 1: 取得文字回應
         const chatRes = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -360,7 +348,6 @@
           return;
         }
 
-        // Step 2: 取得廣東話 TTS 語音
         statusEl.innerText = "余主任準備緊回答同語音...";
         showAudioBadge("廣東話語音生成中...");
 
@@ -372,7 +359,6 @@
 
         const ttsData = await ttsRes.json();
 
-        // Step 3: 文字與語音同步呈現
         chatHistory.push({ role: "assistant", content: replyText });
 
         if (ttsData.audio_url) {
@@ -414,7 +400,6 @@
       }
     }
 
-    // 4. 即時語音辨識（包含即時字幕、1.8s 自動傳送、按鍵開關控制）
     function startVoiceInput() {
       const btn = document.querySelector('.btn-voice');
       const input = document.getElementById('text-input');
@@ -424,7 +409,6 @@
         return;
       }
 
-      // 正在錄音中 -> 再點擊一次即為「手動完成並傳送」
       if (isRecording) {
         if (silenceTimer) clearTimeout(silenceTimer);
         if (recognition) recognition.stop();
@@ -435,11 +419,11 @@
       recognition = new SpeechRecognition();
       recognition.lang = 'zh-HK';
       recognition.continuous = true;
-      recognition.interimResults = true; // 開啟即時字幕顯示
+      recognition.interimResults = true;
 
       isRecording = true;
       btn.innerText = "🔴 錄音中... (點擊完成發問)";
-      btn.style.backgroundColor = "#e53935"; // 變為紅色
+      btn.style.backgroundColor = "#e53935";
       statusEl.innerText = "正在聆聽中，請說出你的問題...";
       input.value = "";
 
@@ -462,7 +446,6 @@
         input.value = currentText;
         statusEl.innerText = "聽緊你講： " + currentText;
 
-        // 停頓 1.8 秒無聲，自動完成並發送
         silenceTimer = setTimeout(() => {
           if (recognition && isRecording) {
             recognition.stop();
@@ -480,7 +463,7 @@
         resetVoiceButton();
         const textToSend = input.value.trim();
         if (textToSend) {
-          handleSend(); // 自動發送
+          handleSend();
         }
       };
 
