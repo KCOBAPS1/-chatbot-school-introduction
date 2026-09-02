@@ -357,7 +357,6 @@
           statusEl.innerText = replyText;
           addQuestionToHistory(trimmedQuery, replyText);
           chatHistory.push({ role: "assistant", content: replyText });
-          alert("Cantonese.ai 語音生成失敗（可能網絡超時或達到使用上限）。");
         }
 
       } catch (error) {
@@ -394,11 +393,11 @@
         statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
         clearAudioBadge();
-        alert("無法播放語音檔案。");
+        console.warn("Audio file missing or failed to play:", audioUrl);
       };
 
       currentAudio.play().catch(e => {
-        console.warn("Autoplay blocked:", e);
+        console.warn("Autoplay blocked or failed:", e);
         statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
       });
