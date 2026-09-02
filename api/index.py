@@ -143,7 +143,7 @@ async def generate_tts(request: TTSRequest):
         return {"audio_url": None}
 
     try:
-        async with httpx.AsyncClient(timeout=25.0) as client:
+        async with httpx.AsyncClient(timeout=35.0) as client:
             payload = {
                 "api_key": api_key,
                 "text": request.text,
