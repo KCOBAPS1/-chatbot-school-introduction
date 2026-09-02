@@ -265,7 +265,7 @@
       const welcomeText = "你好呀！我係英小嘅余主任。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
       statusEl.innerText = welcomeText;
       
-      playAudioOrFallback(welcomeText, 'welcome.mp3');
+      playAudio('welcome.mp3', welcomeText, null, null);
       chatHistory.push({ role: "assistant", content: welcomeText });
     }
 
@@ -308,15 +308,18 @@
       if (sendBtn) sendBtn.disabled = true;
       if (inputField) inputField.disabled = true;
 
-      statusEl.innerText = "余主任解答緊，請稍候...";
+      statusEl.innerText = "余主任思考緊回答，請稍候...";
       clearAudioBadge();
 
-      if (currentAudio) currentAudio.pause();
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
 
       chatHistory.push({ role: "user", content: trimmedQuery });
 
       try {
+        // 1. Fetch Chat AI text response
         const chatRes = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -326,20 +329,16 @@
         const chatData = await chatRes.json();
 
         if (!chatRes.ok || !chatData.text) {
-          statusEl.innerText = `伺服器錯誤: ${chatData.text || '無法取得回應'}`;
+          statusEl.innerText = `伺服器錯誤: ${chatData.detail || '無法取得回應'}`;
           chatHistory.pop();
           return;
         }
 
         const replyText = chatData.text;
+        statusEl.innerText = "余主任準備緊廣東話語音...";
 
-        statusEl.innerText = replyText;
-        addQuestionToHistory(trimmedQuery, replyText);
-        chatHistory.push({ role: "assistant", content: replyText });
-
-        showAudioBadge("廣東話語音朗讀中...");
-
-        // Try backend TTS API
+        // 2. Fetch TTS Voice from Cantonese.ai
+        let audioUrl = null;
         try {
           const ttsRes = await fetch('/api/tts', {
             method: 'POST',
@@ -347,10 +346,22 @@
             body: JSON.stringify({ text: replyText })
           });
           const ttsData = await ttsRes.json();
-
-          playAudioOrFallback(replyText, ttsData.audio_url);
+          audioUrl = ttsData.audio_url;
         } catch (e) {
-          playAudioOrFallback(replyText, null);
+          console.error("TTS Fetch Error:", e);
+        }
+
+        // 3. Reveal Text and Play Audio Simultaneously
+        if (audioUrl) {
+          playAudio(audioUrl, replyText, trimmedQuery, () => {
+            chatHistory.push({ role: "assistant", content: replyText });
+          });
+        } else {
+          // If Cantonese.ai fails or rate-limits, reveal text with an alert
+          statusEl.innerText = replyText;
+          addQuestionToHistory(trimmedQuery, replyText);
+          chatHistory.push({ role: "assistant", content: replyText });
+          alert("Cantonese.ai 語音生成失敗（可能網絡超時或達到使用上限）。");
         }
 
       } catch (error) {
@@ -367,39 +378,35 @@
       }
     }
 
-    // Play Audio URL or Fallback to Browser Native Cantonese Speech
-    function playAudioOrFallback(text, audioUrl) {
-      if (audioUrl) {
-        currentAudio.src = audioUrl;
-        showAudioBadge("播放語音中");
-        currentAudio.play().then(() => {
-          currentAudio.onended = () => clearAudioBadge();
-        }).catch(e => {
-          console.warn("Audio file blocked or failed, using browser speech fallback:", e);
-          speakBrowserSpeech(text);
-        });
-      } else {
-        speakBrowserSpeech(text);
-      }
-    }
+    function playAudio(audioUrl, replyText, studentQuery, onSuccess) {
+      currentAudio.src = audioUrl;
 
-    function speakBrowserSpeech(text) {
-      if (!('speechSynthesis' in window)) {
+      // Reveal text ONLY when sound starts playing
+      currentAudio.onplay = () => {
+        statusEl.innerText = replyText;
+        if (studentQuery) {
+          addQuestionToHistory(studentQuery, replyText);
+        }
+        showAudioBadge("余主任說話中...");
+        if (onSuccess) onSuccess();
+      };
+
+      currentAudio.onended = () => {
         clearAudioBadge();
-        return;
-      }
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-HK';
-      utterance.rate = 1.0;
+      };
 
-      showAudioBadge("廣東話朗讀中");
+      currentAudio.onerror = () => {
+        statusEl.innerText = replyText;
+        if (studentQuery) addQuestionToHistory(studentQuery, replyText);
+        clearAudioBadge();
+        alert("無法播放語音檔案。");
+      };
 
-      utterance.onend = () => clearAudioBadge();
-      utterance.onerror = () => clearAudioBadge();
-
-      window.speechSynthesis.speak(utterance);
+      currentAudio.play().catch(e => {
+        console.warn("Autoplay blocked:", e);
+        statusEl.innerText = replyText;
+        if (studentQuery) addQuestionToHistory(studentQuery, replyText);
+      });
     }
 
     function startVoiceInput() {
