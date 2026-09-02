@@ -1,492 +1,174 @@
-<!DOCTYPE html>
-<html lang="zh-HK">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>英皇書院同學會小學：余主任</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-      background: #1e222b url('background.png') no-repeat center center fixed;
-      background-size: cover;
-      color: #ffffff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    
-    .app-container {
-      display: flex;
-      gap: 24px;
-      width: 100%;
-      max-width: 1100px;
-      height: 660px;
-      position: relative;
-    }
-    
-    .start-overlay {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(26, 30, 38, 0.96);
-      border-radius: 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-      gap: 24px;
-      text-align: center;
-      padding: 20px;
-    }
-    .start-overlay h2 {
-      font-size: 26px;
-      font-weight: bold;
-      color: #ffffff;
-    }
-    .btn-start {
-      padding: 18px 40px;
-      font-size: 22px;
-      font-weight: bold;
-      background-color: #34a853;
-      color: white;
-      border: none;
-      border-radius: 36px;
-      cursor: pointer;
-      box-shadow: 0 6px 20px rgba(52, 168, 83, 0.4);
-      transition: transform 0.2s, background-color 0.2s;
-    }
-    .btn-start:hover {
-      background-color: #2d9247;
-    }
-    .btn-start:active {
-      transform: scale(0.96);
-    }
+import os
+import re
+import base64
+from typing import List, Dict, Any
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import httpx
 
-    .left-panel, .right-panel {
-      background-color: rgba(43, 49, 62, 0.94);
-      border-radius: 16px;
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    }
-    
-    .panel-title {
-      font-size: 22px;
-      font-weight: bold;
-      margin-bottom: 18px;
-      color: #ffffff;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-      padding-bottom: 8px;
-    }
-    
-    .avatar-container {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background-color: #1a1e26;
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 18px;
-      padding: 12px;
-    }
-    .avatar-container img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      object-position: top center;
-    }
-    
-    .btn-voice {
-      width: 100%;
-      padding: 15px;
-      background-color: #34a853;
-      color: #ffffff;
-      border: none;
-      border-radius: 28px;
-      font-size: 18px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 14px;
-      transition: background-color 0.2s, transform 0.1s;
-    }
-    .btn-voice:active {
-      transform: scale(0.98);
-    }
-    
-    .input-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    .input-row input {
-      flex: 1;
-      padding: 12px 16px;
-      background-color: #1e222b;
-      border: 1px solid #3c4250;
-      border-radius: 10px;
-      color: #ffffff;
-      font-size: 16px;
-    }
-    .input-row input:focus {
-      outline: none;
-      border-color: #4285f4;
-    }
-    .input-row button {
-      padding: 12px 24px;
-      background-color: #4285f4;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-    .input-row button:hover {
-      background-color: #3367d6;
-    }
-    .input-row button:disabled {
-      background-color: #555555;
-      cursor: not-allowed;
-    }
-    
-    .status-container {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 50px;
-    }
-    
-    .status-box {
-      font-size: 16px;
-      color: #e0e4ec;
-      line-height: 1.5;
-    }
-    
-    .audio-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      align-self: flex-start;
-      font-size: 14px;
-      background: rgba(66, 133, 244, 0.2);
-      color: #8ab4f8;
-      border: 1px solid rgba(66, 133, 244, 0.4);
-      padding: 6px 14px;
-      border-radius: 16px;
-      animation: pulse 1.5s infinite ease-in-out;
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 0.6; }
-      50% { opacity: 1.0; }
-      100% { opacity: 0.6; }
-    }
+app = FastAPI(title="英皇書院同學會小學 余主任 Chatbot API")
 
-    .history-box {
-      flex: 1;
-      background-color: #1a1e26;
-      border-radius: 12px;
-      padding: 20px;
-      overflow-y: auto;
-      font-size: 16px;
-      color: #d1d5db;
-      line-height: 1.7;
-    }
-    .chat-item {
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #2b313e;
-      color: #ffffff;
-      word-break: break-word;
-    }
-    .chat-item strong {
-      color: #8ab4f8;
-    }
-  </style>
-</head>
-<body>
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-  <div class="app-container">
-    <div id="start-overlay" class="start-overlay">
-      <h2>歡迎嚟到英皇書院同學會小學！</h2>
-      <button class="btn-start" onclick="startApp()">🏫 開始諮詢余主任</button>
-    </div>
+class ChatRequest(BaseModel):
+    messages: List[Dict[str, Any]]
 
-    <div class="left-panel">
-      <div class="panel-title">英皇書院同學會小學：余主任</div>
-      <div class="avatar-container">
-        <img src="avatar.png" alt="余主任">
-      </div>
-      
-      <button class="btn-voice" onclick="startVoiceInput()">🎤 按此語音發問</button>
-      
-      <div class="input-row">
-        <input type="text" id="text-input" placeholder="查詢學校特色、課程或升中資訊..." onkeydown="if(event.key==='Enter') handleSend()">
-        <button class="send" onclick="handleSend()">傳送</button>
-      </div>
-      
-      <div class="status-container">
-        <div id="status" class="status-box">余主任準備好為你介紹英小。</div>
-        <div id="audio-badge-container"></div>
-      </div>
-    </div>
+class TTSRequest(BaseModel):
+    text: str
 
-    <div class="right-panel">
-      <div class="panel-title">學校諮詢紀錄</div>
-      <div id="chat-history" class="history-box">與余主任的對話紀錄會顯示在此處。</div>
-    </div>
-  </div>
+def clean_response(text: str) -> str:
+    if not text:
+        return ""
+    text = re.sub(r'---[\s\S]*$', '', text)
+    text = re.sub(r'(?i)learn\s+more:[\s\S]*$', '', text)
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    text = re.sub(r'https?://\S+', '', text)
+    text = text.replace('**', '').replace('__', '').replace('*', '')
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return " ".join(lines)
 
-  <script>
-    let chatHistory = [];
-    let currentAudio = new Audio();
-    let recognition = null;
-    let isRecording = false;
-    let silenceTimer = null;
+SCHOOL_INFO = ""
+possible_paths = [
+    os.path.join(os.path.dirname(__file__), "..", "schoolintroduction.txt"),
+    os.path.join(os.path.dirname(__file__), "..", "schoolintroduction"),
+    os.path.join(os.getcwd(), "schoolintroduction.txt"),
+    os.path.join(os.getcwd(), "schoolintroduction"),
+]
 
-    const statusEl = document.getElementById('status');
-    const badgeContainer = document.getElementById('audio-badge-container');
+for path in possible_paths:
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                SCHOOL_INFO = f.read().strip()
+            if SCHOOL_INFO:
+                break
+        except Exception as e:
+            print(f"Error reading {path}: {e}")
 
-    function startApp() {
-      document.getElementById('start-overlay').style.display = 'none';
+SYSTEM_PROMPT = {
+    "role": "system",
+    "content": (
+        "你係英皇書院同學會小學嘅「余主任」。\n\n"
+        "【核心校舍資料（必須完全準確）】\n"
+        "1. 本校名稱：英皇書院同學會小學（英文：King's College Old Boys' Association Primary School）\n"
+        "2. 本校地址：香港上環必列者士街58號\n"
+        "3. 絕對嚴禁混淆：本校地址係「必列者士街58號」，絕對唔係「普慶坊40號」（普慶坊係第二校，唔係本校）！\n"
+        "4. 本校電話：2547 7468\n\n"
+        "【對話與格式規則】\n"
+        "1. 回答必須極之簡短、自然、像真人對話，控制在 2 至 3 句以內（方便廣東話語音朗讀）。\n"
+        "2. 嚴禁輸出任何網址、https 連結、Markdown 超連結或「Learn more」區域。\n"
+        "3. 如被問及學校網址，請只講出簡短域名「kcobaps1.edu.hk」。\n"
+        "4. 你只可以回答與「英皇書院同學會小學」相關嘅問題（例如地址、交通、特色、課程、升中、校園生活）。\n"
+        "5. 如問題與本校無關，請禮貌拒絕：「我係英小嘅余主任，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n"
+        "6. 請使用親切、專業同禮貌嘅廣東話（繁體中文）回答。\n\n"
+        f"【補充資料檔案】\n{SCHOOL_INFO}"
+    )
+}
 
-      const welcomeText = "你好呀！我係英小嘅余主任。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
-      statusEl.innerText = welcomeText;
-      
-      playAudio('welcome.mp3', welcomeText, null, null);
-      chatHistory.push({ role: "assistant", content: welcomeText });
-    }
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    poe_api_key = os.getenv("POE_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if not poe_api_key:
+        raise HTTPException(status_code=500, detail="POE_API_KEY is not configured")
 
-    function showAudioBadge(text) {
-      badgeContainer.innerHTML = `<span class="audio-badge">🔊 ${text}</span>`;
-    }
+    poe_bot_handle = os.getenv("POE_BOT_NAME", "schoolchatbotyu")
 
-    function clearAudioBadge() {
-      badgeContainer.innerHTML = '';
-    }
+    formatted_messages = [SYSTEM_PROMPT]
+    for msg in request.messages:
+        formatted_messages.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", "")
+        })
 
-    function handleSend() {
-      const input = document.getElementById('text-input');
-      const text = input.value.trim();
-      if (text) {
-        input.value = '';
-        sendQueryToBackend(text);
-      }
-    }
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://api.poe.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {poe_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": poe_bot_handle,
+                    "messages": formatted_messages,
+                    "temperature": 0.1
+                }
+            )
 
-    function addQuestionToHistory(question, answer) {
-      const historyBox = document.getElementById('chat-history');
-      if (historyBox.innerHTML.includes('與余主任的對話紀錄會顯示在此處。')) {
-        historyBox.innerHTML = '';
-      }
-      const item = document.createElement('div');
-      item.className = 'chat-item';
-      item.innerHTML = `<strong>問：</strong>${question}<br><strong>答：</strong>${answer}`;
-      historyBox.appendChild(item);
-      historyBox.scrollTop = historyBox.scrollHeight;
-    }
+            if response.status_code == 200:
+                data = response.json()
+                raw_text = data["choices"][0]["message"]["content"]
+                return {"text": clean_response(raw_text)}
 
-    async function sendQueryToBackend(studentQuery) {
-      const trimmedQuery = studentQuery.trim();
-      if (!trimmedQuery) return;
+            openai_response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {poe_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": formatted_messages,
+                    "temperature": 0.1
+                }
+            )
 
-      const sendBtn = document.querySelector('.send');
-      const inputField = document.getElementById('text-input');
+            if openai_response.status_code == 200:
+                data = openai_response.json()
+                raw_text = data["choices"][0]["message"]["content"]
+                return {"text": clean_response(raw_text)}
 
-      if (sendBtn) sendBtn.disabled = true;
-      if (inputField) inputField.disabled = true;
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"API Request Failed: {response.text}"
+            )
 
-      statusEl.innerText = "余主任思考緊回答，請稍候...";
-      clearAudioBadge();
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
 
-      chatHistory.push({ role: "user", content: trimmedQuery });
+@app.post("/api/tts")
+async def generate_tts(request: TTSRequest):
+    api_key = os.getenv("CANTONESE_AI_API_KEY")
+    voice_id = os.getenv("CANTONESE_AI_VOICE")
 
-      try {
-        // 1. Fetch Chat AI text response
-        const chatRes = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: chatHistory })
-        });
+    if not api_key or not voice_id:
+        return {"audio_url": None}
 
-        const chatData = await chatRes.json();
+    try:
+        async with httpx.AsyncClient(timeout=35.0) as client:
+            payload = {
+                "api_key": api_key,
+                "text": request.text,
+                "voice_id": voice_id,
+                "output_extension": "mp3"
+            }
 
-        if (!chatRes.ok || !chatData.text) {
-          statusEl.innerText = `伺服器錯誤: ${chatData.detail || '無法取得回應'}`;
-          chatHistory.pop();
-          return;
-        }
+            response = await client.post(
+                "https://cantonese.ai/api/tts",
+                headers={"Content-Type": "application/json"},
+                json=payload
+            )
 
-        const replyText = chatData.text;
-        statusEl.innerText = "余主任準備緊回答，請稍候...";
+            if response.status_code == 200:
+                content_type = response.headers.get("content-type", "")
+                if "application/json" in content_type:
+                    data = response.json()
+                    return {"audio_url": data.get("audio_url")}
+                else:
+                    audio_b64 = base64.b64encode(response.content).decode("utf-8")
+                    return {"audio_url": f"data:audio/mp3;base64,{audio_b64}"}
 
-        // 2. Fetch TTS Voice from Cantonese.ai
-        let audioUrl = null;
-        try {
-          const ttsRes = await fetch('/api/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: replyText })
-          });
-          const ttsData = await ttsRes.json();
-          audioUrl = ttsData.audio_url;
-        } catch (e) {
-          console.error("TTS Fetch Error:", e);
-        }
+            print(f"Cantonese.ai API Error [{response.status_code}]: {response.text}")
+            return {"audio_url": None}
 
-        // 3. Reveal Text and Play Audio Simultaneously
-        if (audioUrl) {
-          playAudio(audioUrl, replyText, trimmedQuery, () => {
-            chatHistory.push({ role: "assistant", content: replyText });
-          });
-        } else {
-          statusEl.innerText = replyText;
-          addQuestionToHistory(trimmedQuery, replyText);
-          chatHistory.push({ role: "assistant", content: replyText });
-          alert("Cantonese.ai 語音生成失敗（可能網絡超時或達到使用上限）。");
-        }
-
-      } catch (error) {
-        console.error("Fetch error:", error);
-        statusEl.innerText = "網絡請求失敗：" + error.message;
-        clearAudioBadge();
-        chatHistory.pop();
-      } finally {
-        if (sendBtn) sendBtn.disabled = false;
-        if (inputField) {
-          inputField.disabled = false;
-          inputField.focus();
-        }
-      }
-    }
-
-    function playAudio(audioUrl, replyText, studentQuery, onSuccess) {
-      currentAudio.src = audioUrl;
-
-      // Reveal text ONLY when sound starts playing
-      currentAudio.onplay = () => {
-        statusEl.innerText = replyText;
-        if (studentQuery) {
-          addQuestionToHistory(studentQuery, replyText);
-        }
-        showAudioBadge("余主任說話中...");
-        if (onSuccess) onSuccess();
-      };
-
-      currentAudio.onended = () => {
-        clearAudioBadge();
-      };
-
-      currentAudio.onerror = () => {
-        statusEl.innerText = replyText;
-        if (studentQuery) addQuestionToHistory(studentQuery, replyText);
-        clearAudioBadge();
-        alert("無法播放語音檔案。");
-      };
-
-      currentAudio.play().catch(e => {
-        console.warn("Autoplay blocked:", e);
-        statusEl.innerText = replyText;
-        if (studentQuery) addQuestionToHistory(studentQuery, replyText);
-      });
-    }
-
-    function startVoiceInput() {
-      const btn = document.querySelector('.btn-voice');
-      const input = document.getElementById('text-input');
-
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        alert('你的瀏覽器不支援語音辨識功能。');
-        return;
-      }
-
-      if (isRecording) {
-        if (silenceTimer) clearTimeout(silenceTimer);
-        if (recognition) recognition.stop();
-        return;
-      }
-
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.lang = 'zh-HK';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      isRecording = true;
-      btn.innerText = "🔴 錄音中... (點擊完成發問)";
-      btn.style.backgroundColor = "#e53935";
-      statusEl.innerText = "正在聆聽中，請說出你的問題...";
-      input.value = "";
-
-      let finalTranscript = "";
-
-      recognition.onresult = (event) => {
-        let interimTranscript = "";
-
-        if (silenceTimer) clearTimeout(silenceTimer);
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-
-        const currentText = finalTranscript || interimTranscript;
-        input.value = currentText;
-        statusEl.innerText = "聽緊你講： " + currentText;
-
-        silenceTimer = setTimeout(() => {
-          if (recognition && isRecording) {
-            recognition.stop();
-          }
-        }, 1800);
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        statusEl.innerText = "語音辨識失敗，請重試。";
-        resetVoiceButton();
-      };
-
-      recognition.onend = () => {
-        resetVoiceButton();
-        const textToSend = input.value.trim();
-        if (textToSend) {
-          handleSend();
-        }
-      };
-
-      recognition.start();
-    }
-
-    function resetVoiceButton() {
-      isRecording = false;
-      if (silenceTimer) clearTimeout(silenceTimer);
-      const btn = document.querySelector('.btn-voice');
-      if (btn) {
-        btn.innerText = "🎤 按此語音發問";
-        btn.style.backgroundColor = "#34a853";
-      }
-    }
-  </script>
-</body>
-</html>
+    except Exception as e:
+        print(f"TTS Request Exception: {e}")
+        return {"audio_url": None}
