@@ -23,7 +23,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 你的 Google Apps Script Webhook 網址
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxI-n1nmYW43zAo-fShO7jCx1azXbL0EUo4W3HHibYU5epakHByMGjinEvG95jOX_da0w/exec"
 
 class Query(BaseModel):
@@ -33,7 +32,6 @@ class TTSRequest(BaseModel):
     text: str
 
 async def send_log_to_google_sheet(user_id: str, user_msg: str, bot_msg: str):
-    """背景非同步發送對話紀錄至 Google Apps Script"""
     if not WEBHOOK_URL:
         return
     try:
@@ -48,19 +46,17 @@ async def send_log_to_google_sheet(user_id: str, user_msg: str, bot_msg: str):
         logger.error(f"[Google Sheet Log Error]: {str(e)}")
 
 def prepare_tts_text(text: str) -> str:
-    """清理 LaTeX、引號與特殊符號，確保 TTS 生成穩定"""
-    # 1. 移除 LaTeX 符號
     cleaned = re.sub(r'\\[\(\)\[\]]', '', text)
     cleaned = re.sub(r'[\$\\]', '', cleaned)
-    
-    # 2. 移除中英文引號（「」『』“”"''），防止 Cantonese.ai API 解析失誤
     cleaned = re.sub(r'[「」『』“”"\'`]', '', cleaned)
     
-    # 3. 數字轉廣東話漢字
     num_map = {
-        '90': '九十', '180': '一百八十', '360': '三百六十',
-        '0': '零', '1': '一', '2': '二', '3': '三', '4': '四',
-        '5': '五', '6': '六', '7': '七', '8': '八', '9': '九'
+        '1960': '一九六零', '2025': '二零二五', '2026': '二零二六',
+        '6000': '六千', '150': '一百五十', '90': '九十', '14': '十四',
+        '60': '六十', '17': '十七', '27': '二十七', '73%': '百分之七十三',
+        '93%': '百分之九十三', '98%': '百分之九十八', '0': '零', '1': '一',
+        '2': '二', '3': '三', '4': '四', '5': '五', '6': '六', '7': '七',
+        '8': '八', '9': '九'
     }
     for k, v in num_map.items():
         cleaned = cleaned.replace(k, v)
@@ -87,11 +83,11 @@ async def chat(query: Query):
     system_instruction = {
         "role": "system",
         "content": (
-            "你係小學數學老師「余主任」。\n"
-            "【說話規則】：\n"
-            "1. 對話開始時，如果學生未提供名字，請先親切打招呼並問學生名字（例如：「你好呀！我係余主任。請問你叫咩名呀？」）。\n"
-            "2. 如果已經知道學生名字，請稱呼佢名字。\n"
-            "3. 請用簡短、親切嘅繁體廣東話回答，每次回答控制喺35個字以內，避免複雜數學符號。"
+            "你係英皇書院同學會小學（簡稱「英小」）嘅「余主任」。\n"
+            "【角色與回答規則】：\n"
+            "1. 必須嚴格基於學校官方資料回答，絕不可捏造或自行想像任何未提及嘅內容。\n"
+            "2. 若查詢內容不在官方資料內，請禮貌回應：「抱歉，資料中暫未有相關詳細紀錄，建議向學校辦公室直接查詢。」\n"
+            "3. 請用親切、專業嘅繁體廣東話回答，內容清晰簡潔，展現「只要在英小，誰都可發光」嘅辦學精神。"
         )
     }
     formatted_messages = [system_instruction] + cleaned_messages
@@ -104,10 +100,10 @@ async def chat(query: Query):
         )
 
         response = await poe_client.chat.completions.create(
-            model="masterYuBotnew2",
+            model="schoolchatbotyu",
             messages=formatted_messages,
-            temperature=0.3,
-            max_tokens=85
+            temperature=0.2,
+            max_tokens=250
         )
 
         reply_text = ""
@@ -149,7 +145,6 @@ async def generate_tts(req: TTSRequest):
         if cantonese_voice:
             payload["voice_id"] = cantonese_voice
 
-        # 延長超時至 15.0 秒，確保長句有足夠時間生成語音
         async with httpx.AsyncClient(timeout=15.0) as client:
             res = await client.post(tts_url, json=payload, headers=headers)
             if res.status_code == 200:
