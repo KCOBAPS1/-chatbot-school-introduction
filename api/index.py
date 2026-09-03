@@ -76,8 +76,9 @@ SYSTEM_PROMPT = {
 async def chat(request: ChatRequest):
     poe_api_key = os.getenv("POE_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not poe_api_key:
-        raise HTTPException(status_code=500, detail="POE_API_KEY is not configured")
+        raise HTTPException(status_code=500, detail="POE_API_KEY 未設定，請至 Vercel 設定環境變數 POE_API_KEY")
 
+    # 預設 Bot 名稱更新為你的實際 Bot 代號
     poe_bot_handle = os.getenv("POE_BOT_NAME", "schoolcbcollectdata")
 
     formatted_messages = [SYSTEM_PROMPT]
@@ -88,7 +89,8 @@ async def chat(request: ChatRequest):
         })
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            # 1. 呼叫 Poe API
             response = await client.post(
                 "https://api.poe.com/v1/chat/completions",
                 headers={
@@ -104,9 +106,11 @@ async def chat(request: ChatRequest):
 
             if response.status_code == 200:
                 data = response.json()
-                raw_text = data["choices"][0]["message"]["content"]
-                return {"text": clean_response(raw_text)}
+                raw_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                cleaned = clean_response(raw_text)
+                return {"text": cleaned or raw_text or "余主任收到你的查詢，請稍後重試。"}
 
+            # 2. Poe 失敗時嘗試 OpenAI 備用
             openai_response = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
@@ -122,16 +126,20 @@ async def chat(request: ChatRequest):
 
             if openai_response.status_code == 200:
                 data = openai_response.json()
-                raw_text = data["choices"][0]["message"]["content"]
-                return {"text": clean_response(raw_text)}
+                raw_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                cleaned = clean_response(raw_text)
+                return {"text": cleaned or raw_text or "余主任收到你的查詢，請稍後重試。"}
 
+            # 若兩者皆失敗，回傳完整錯誤狀態與內文
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"API Request Failed: {response.text}"
+                detail=f"API 請求失敗 [{response.status_code}]: {response.text}"
             )
 
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="請求超時，Poe API 回應超時")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"伺服器錯誤: {str(e)}")
 
 
 @app.post("/api/tts")
@@ -143,7 +151,7 @@ async def generate_tts(request: TTSRequest):
         return {"audio_url": None}
 
     try:
-        async with httpx.AsyncClient(timeout=35.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             payload = {
                 "api_key": api_key,
                 "text": request.text,
@@ -166,7 +174,6 @@ async def generate_tts(request: TTSRequest):
                     audio_b64 = base64.b64encode(response.content).decode("utf-8")
                     return {"audio_url": f"data:audio/mp3;base64,{audio_b64}"}
 
-            print(f"Cantonese.ai API Error [{response.status_code}]: {response.text}")
             return {"audio_url": None}
 
     except Exception as e:
