@@ -78,7 +78,7 @@ async def chat(request: ChatRequest):
     if not poe_api_key:
         raise HTTPException(status_code=500, detail="POE_API_KEY is not configured")
 
-    poe_bot_handle = os.getenv("POE_BOT_NAME", "schoolchatbotyu")
+    poe_bot_handle = os.getenv("POE_BOT_NAME", "schoolcbcollectdata")
 
     formatted_messages = [SYSTEM_PROMPT]
     for msg in request.messages:
