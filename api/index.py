@@ -8,11 +8,11 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 # 讀取 Vercel 環境變數
-POE_API_KEY = os.environ.get("POE_API_KEY")
-POE_BOT_NAME = os.environ.get("POE_BOT_NAME", "GPT-4o-Mini")
+POE_API_KEY = os.environ.get("POE_API_KEY", "").strip()
+POE_BOT_NAME = os.environ.get("POE_BOT_NAME", "GPT-4o-Mini").strip()
 
-CANTONESE_AI_API_KEY = os.environ.get("CANTONESE_AI_API_KEY")
-CANTONESE_AI_VOICE = os.environ.get("CANTONESE_AI_VOICE")
+CANTONESE_AI_API_KEY = os.environ.get("CANTONESE_AI_API_KEY", "").strip()
+CANTONESE_AI_VOICE = os.environ.get("CANTONESE_AI_VOICE", "").strip()
 
 
 def clean_json_string(raw_str: str) -> str:
@@ -34,7 +34,6 @@ def chat():
         if not POE_API_KEY:
             return jsonify({"detail": "Vercel 未設定 POE_API_KEY 環境變數"}), 500
 
-        # 呼叫 Poe 相容接口
         headers = {
             "Authorization": f"Bearer {POE_API_KEY}",
             "Content-Type": "application/json"
@@ -57,7 +56,6 @@ def chat():
 
         res_data = response.json()
 
-        # 解析 Poe 回傳內容
         raw_text = ""
         if "choices" in res_data and len(res_data["choices"]) > 0:
             raw_text = res_data["choices"][0].get("message", {}).get("content", "")
@@ -67,7 +65,6 @@ def chat():
         display_text = raw_text
         spoken_text = raw_text
 
-        # 嘗試解開雙語 JSON (text 與 speech)
         try:
             cleaned_text = clean_json_string(raw_text)
             parsed = json.loads(cleaned_text)
@@ -96,15 +93,15 @@ def tts():
         text = data.get("text", "").strip()
 
         if not text:
-            return jsonify({"audio_url": None}), 400
+            return jsonify({"audio_url": None, "error": "缺少生成文字"}), 400
 
         if not CANTONESE_AI_API_KEY:
-            print("Missing CANTONESE_AI_API_KEY in environment variables.")
-            return jsonify({"audio_url": None, "error": "未設定 CANTONESE_AI_API_KEY"}), 500
+            return jsonify({"audio_url": None, "error": "Vercel 未能讀取到 CANTONESE_AI_API_KEY 環境變數"}), 500
 
-        # 呼叫 Cantonese.ai 官方語音生成接口
+        # 發送至 Cantonese.ai API
         headers = {
             "Authorization": f"Bearer {CANTONESE_AI_API_KEY}",
+            "x-api-key": CANTONESE_AI_API_KEY,
             "Content-Type": "application/json"
         }
 
@@ -118,29 +115,36 @@ def tts():
             "https://api.cantonese.ai/v1/tts",
             headers=headers,
             json=payload,
-            timeout=8.0
+            timeout=10.0
         )
 
         if tts_res.status_code != 200:
-            print(f"Cantonese.ai API Error ({tts_res.status_code}): {tts_res.text}")
-            return jsonify({"audio_url": None, "error": tts_res.text}), 500
+            error_msg = f"Cantonese.ai 伺服器回應錯誤 ({tts_res.status_code}): {tts_res.text}"
+            print(error_msg)
+            return jsonify({"audio_url": None, "error": error_msg}), 200
 
-        # 處理 Cantonese.ai 回傳格式（JSON 或 二進制音訊）
         content_type = tts_res.headers.get("content-type", "")
+        
+        # 處理 JSON 格式回傳
         if "application/json" in content_type:
             res_json = tts_res.json()
             audio_url = res_json.get("audio_url") or res_json.get("url")
             if not audio_url and "audio" in res_json:
                 audio_url = f"data:audio/mp3;base64,{res_json['audio']}"
+            
+            if not audio_url:
+                return jsonify({"audio_url": None, "error": f"Cantonese.ai 未回傳有效音訊網址: {res_json}"}), 200
+                
             return jsonify({"audio_url": audio_url})
         else:
-            # 直接回傳音訊檔案時轉為 Base64 供前端播放
+            # 處理二進制音訊檔回傳
             b64_audio = base64.b64encode(tts_res.content).decode("utf-8")
             return jsonify({"audio_url": f"data:audio/mp3;base64,{b64_audio}"})
 
     except Exception as e:
-        print("Cantonese.ai TTS Fetch Error:", str(e))
-        return jsonify({"audio_url": None, "error": str(e)}), 500
+        error_msg = f"呼叫 Cantonese.ai 發生異常: {str(e)}"
+        print(error_msg)
+        return jsonify({"audio_url": None, "error": error_msg}), 200
 
 
 if __name__ == "__main__":
