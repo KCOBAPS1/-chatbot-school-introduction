@@ -1,61 +1,43 @@
 import os
-import re
+import json
+import asyncio
 import base64
-from typing import List, Dict, Any
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import httpx
+from flask import Flask, request, jsonify
+from openai import OpenAI
+import edge_tts
 
-app = FastAPI(title="英皇書院同學會小學 屈嘉曼校長 Chatbot API")
+app = Flask(__name__)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 初始化 OpenAI 用戶端
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-class ChatRequest(BaseModel):
-    messages: List[Dict[str, Any]]
+# 學校詳細資料背景庫
+SCHOOL_INFO = """
+英皇書院同學會小學（King's College Old Boys' Association Primary School）
+地址：香港上環必列者士街58號
+電話：2547 7468
+網址：kcobaps1.edu.hk
 
-class TTSRequest(BaseModel):
-    text: str
-
-def clean_response(text: str) -> str:
-    if not text:
-        return ""
-    text = re.sub(r'---[\s\S]*$', '', text)
-    text = re.sub(r'(?i)learn\s+more:[\s\S]*$', '', text)
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-    text = re.sub(r'https?://\S+', '', text)
-    text = text.replace('**', '').replace('__', '').replace('*', '')
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return " ".join(lines)
-
-SCHOOL_INFO = ""
-possible_paths = [
-    os.path.join(os.path.dirname(__file__), "..", "schoolintroduction.txt"),
-    os.path.join(os.path.dirname(__file__), "..", "schoolintroduction"),
-    os.path.join(os.getcwd(), "schoolintroduction.txt"),
-    os.path.join(os.getcwd(), "schoolintroduction"),
-]
-
-for path in possible_paths:
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                SCHOOL_INFO = f.read().strip()
-            if SCHOOL_INFO:
-                break
-        except Exception as e:
-            print(f"Error reading {path}: {e}")
+學校重點特色：
+1. 辦學宗旨與精神：以「堅毅平實」嘅「無花果精神」滋養學生品德，注重小班教學，令每位學生都能被看見、發光發亮。
+2. 小一過渡期照顧：實施「三班主任制」同埋階梯式適應課程，提供幸福關愛校園環境。
+3. 數字創新教育：獲教育局指定為「數字教育卓越學校」，引導學生運用編程（Coding）同人工智能（AI）解決問題。
+4. 升中表現優異：連續七年超過七成畢業生獲派英文中學（英中），獲派首三志願比率高達 98%。
+5. 地理位置澄清：本校位於「上環必列者士街58號」，絕對唔係「普慶坊40號」（普慶坊係第二校，請勿混淆）。
+"""
 
 SYSTEM_PROMPT = {
     "role": "system",
     "content": (
         "你係英皇書院同學會小學嘅現任校長「屈嘉曼校長」。\n\n"
+        "【核心語言指令（極重要）：必須全程使用地道廣東話口語】\n"
+        "1. 你的所有回答必須使用自然、親切嘅「廣東話口語」（粵語口語），絕對禁止使用書面語！\n"
+        "   - 用「我哋」切勿用「我們」\n"
+        "   - 用「嘅」切勿用「的」\n"
+        "   - 用「係」切勿用「是」\n"
+        "   - 用「呢度」切勿用「這裡」\n"
+        "   - 用「啱啱 / 依家」切勿用「剛才 / 現在」\n"
+        "2. 語氣要像屈校長親自同家長面談對話一樣自然流利親切。\n\n"
         "【核心校舍資料（必須完全準確）】\n"
         "1. 本校名稱：英皇書院同學會小學（英文：King's College Old Boys' Association Primary School）\n"
         "2. 本校地址：香港上環必列者士街58號\n"
@@ -66,112 +48,63 @@ SYSTEM_PROMPT = {
         "2. 嚴禁輸出任何網址、https 連結、Markdown 超連結或「Learn more」區域。\n"
         "3. 如被問及學校網址，請只講出簡短域名「kcobaps1.edu.hk」。\n"
         "4. 你只可以回答與「英皇書院同學會小學」相關嘅問題（例如地址、交通、特色、課程、升中、校園生活）。\n"
-        "5. 如問題與本校無關，請禮貌拒絕：「我係英小嘅屈嘉曼校長，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n"
-        "6. 請使用親切、專業同禮貌嘅廣東話（繁體中文）回答。\n\n"
+        "5. 如問題與本校無關，請禮貌拒絕：「我係英小嘅屈嘉曼校長，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n\n"
         f"【補充資料檔案】\n{SCHOOL_INFO}"
     )
 }
 
-@app.post("/api/chat")
-async def chat(request: ChatRequest):
-    poe_api_key = os.getenv("POE_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if not poe_api_key:
-        raise HTTPException(status_code=500, detail="POE_API_KEY 未設定，請至 Vercel 設定環境變數 POE_API_KEY")
+async def generate_cantonese_audio(text: str) -> str:
+    """使用 Edge-TTS 生成香港廣東話（HiuMaan 女性聲音）並轉為 Base64 Data URL"""
+    voice = "zh-HK-HiuMaanNeural"  # 香港廣東話女性語音（屈校長聲音）
+    communicate = edge_tts.Communicate(text, voice)
+    
+    audio_bytes = bytearray()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_bytes.extend(chunk["data"])
+            
+    base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+    return f"data:audio/mp3;base64,{base64_audio}"
 
-    poe_bot_handle = os.getenv("POE_BOT_NAME", "schoolcbcollectdata")
-
-    formatted_messages = [SYSTEM_PROMPT]
-    for msg in request.messages:
-        formatted_messages.append({
-            "role": msg.get("role", "user"),
-            "content": msg.get("content", "")
-        })
-
+@app.route('/api/chat', methods=['POST'])
+def chat():
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            response = await client.post(
-                "https://api.poe.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {poe_api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": poe_bot_handle,
-                    "messages": formatted_messages,
-                    "temperature": 0.1
-                }
-            )
+        data = request.get_json() or {}
+        user_messages = data.get('messages', [])
+        
+        # 組合 System Prompt 與使用者對話紀錄
+        messages = [SYSTEM_PROMPT] + user_messages
 
-            if response.status_code == 200:
-                data = response.json()
-                raw_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                cleaned = clean_response(raw_text)
-                return {"text": cleaned or raw_text or "屈校長收到你的查詢，請稍後重試。"}
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=250
+        )
 
-            openai_response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {poe_api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "gpt-4o-mini",
-                    "messages": formatted_messages,
-                    "temperature": 0.1
-                }
-            )
-
-            if openai_response.status_code == 200:
-                data = openai_response.json()
-                raw_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                cleaned = clean_response(raw_text)
-                return {"text": cleaned or raw_text or "屈校長收到你的查詢，請稍後重試。"}
-
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"API 請求失敗 [{response.status_code}]: {response.text}"
-            )
-
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="請求超時，Poe API 回應超時")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"伺服器錯誤: {str(e)}")
-
-
-@app.post("/api/tts")
-async def generate_tts(request: TTSRequest):
-    api_key = os.getenv("CANTONESE_AI_API_KEY")
-    voice_id = os.getenv("CANTONESE_AI_VOICE")
-
-    if not api_key or not voice_id:
-        return {"audio_url": None}
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            payload = {
-                "api_key": api_key,
-                "text": request.text,
-                "voice_id": voice_id,
-                "output_extension": "mp3"
-            }
-
-            response = await client.post(
-                "https://cantonese.ai/api/tts",
-                headers={"Content-Type": "application/json"},
-                json=payload
-            )
-
-            if response.status_code == 200:
-                content_type = response.headers.get("content-type", "")
-                if "application/json" in content_type:
-                    data = response.json()
-                    return {"audio_url": data.get("audio_url")}
-                else:
-                    audio_b64 = base64.b64encode(response.content).decode("utf-8")
-                    return {"audio_url": f"data:audio/mp3;base64,{audio_b64}"}
-
-            return {"audio_url": None}
+        reply_text = response.choices[0].message.content.strip()
+        return jsonify({"text": reply_text})
 
     except Exception as e:
-        print(f"TTS Request Exception: {e}")
-        return {"audio_url": None}
+        print(f"Chat API Error: {str(e)}")
+        return jsonify({"detail": str(e)}), 500
+
+@app.route('/api/tts', methods=['POST'])
+def tts():
+    try:
+        data = request.get_json() or {}
+        text = data.get('text', '')
+
+        if not text:
+            return jsonify({"detail": "缺少文字內容"}), 400
+
+        # 執行非同步廣東話語音合成
+        audio_url = asyncio.run(generate_cantonese_audio(text))
+        return jsonify({"audio_url": audio_url})
+
+    except Exception as e:
+        print(f"TTS API Error: {str(e)}")
+        return jsonify({"detail": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
