@@ -172,6 +172,7 @@
       font-size: 16px;
       color: #e0e4ec;
       line-height: 1.5;
+      white-space: pre-wrap;
     }
 
     .waiting-text-box {
@@ -398,6 +399,9 @@
         currentAudio.pause();
         currentAudio.currentTime = 0;
       }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
 
       playWaitingAudio();
       chatHistory.push({ role: "user", content: trimmedQuery });
@@ -445,10 +449,11 @@
             chatHistory.push({ role: "assistant", content: displayText });
           });
         } else {
-          // 若 Cantonese.ai 呼叫失敗，直接在文字區顯示報錯細節，方便即時排查 Key 或 Voice 問題
-          statusEl.innerText = `${displayText}\n\n⚠️ Cantonese.ai 語音無法播放：${ttsError || '未知錯誤'}`;
+          // Cantonese.ai 斷線時，自動切換至系統內建廣東話語音發音
+          statusEl.innerText = displayText;
           addQuestionToHistory(trimmedQuery, displayText);
           chatHistory.push({ role: "assistant", content: displayText });
+          speakFallbackSystemTTS(spokenText);
         }
 
       } catch (error) {
@@ -464,6 +469,29 @@
           inputField.focus();
         }
       }
+    }
+
+    // 備援語音發音 (Web Speech API zh-HK)
+    function speakFallbackSystemTTS(text) {
+      if (!('speechSynthesis' in window)) return;
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-HK';
+      utterance.rate = 1.0;
+
+      utterance.onstart = () => {
+        showAudioBadge("屈嘉曼校長說話中 (系統備援語音)...");
+      };
+
+      utterance.onend = () => {
+        clearAudioBadge();
+      };
+
+      utterance.onerror = () => {
+        clearAudioBadge();
+      };
+
+      window.speechSynthesis.speak(utterance);
     }
 
     function playAudio(audioUrl, replyText, studentQuery, onSuccess) {
@@ -483,9 +511,11 @@
       };
 
       currentAudio.onerror = () => {
-        statusEl.innerText = `${replyText}\n\n⚠️ 語音檔播放失敗 (音訊格式不相容或已被阻擋)`;
+        // 音訊無法播放時切換至系統發音
+        statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
         clearAudioBadge();
+        speakFallbackSystemTTS(replyText);
       };
 
       currentAudio.play().catch(e => {
