@@ -98,7 +98,6 @@ def tts():
         if not CANTONESE_AI_API_KEY:
             return jsonify({"audio_url": None, "error": "Vercel 未能讀取到 CANTONESE_AI_API_KEY 環境變數"}), 500
 
-        # 發送至 Cantonese.ai API
         headers = {
             "Authorization": f"Bearer {CANTONESE_AI_API_KEY}",
             "x-api-key": CANTONESE_AI_API_KEY,
@@ -118,9 +117,12 @@ def tts():
             timeout=10.0
         )
 
+        # 處理非 200 狀態碼（例如 530 Cloudflare Tunnel Error）
         if tts_res.status_code != 200:
-            error_msg = f"Cantonese.ai 伺服器回應錯誤 ({tts_res.status_code}): {tts_res.text}"
-            print(error_msg)
+            if "<html" in tts_res.text.lower():
+                error_msg = f"Cantonese.ai 官方伺服器暫時離線/維護中 (HTTP {tts_res.status_code} Cloudflare Error)"
+            else:
+                error_msg = f"Cantonese.ai 伺服器錯誤 ({tts_res.status_code}): {tts_res.text[:100]}"
             return jsonify({"audio_url": None, "error": error_msg}), 200
 
         content_type = tts_res.headers.get("content-type", "")
@@ -133,7 +135,7 @@ def tts():
                 audio_url = f"data:audio/mp3;base64,{res_json['audio']}"
             
             if not audio_url:
-                return jsonify({"audio_url": None, "error": f"Cantonese.ai 未回傳有效音訊網址: {res_json}"}), 200
+                return jsonify({"audio_url": None, "error": f"Cantonese.ai 未回傳有效音訊: {res_json}"}), 200
                 
             return jsonify({"audio_url": audio_url})
         else:
@@ -142,9 +144,7 @@ def tts():
             return jsonify({"audio_url": f"data:audio/mp3;base64,{b64_audio}"})
 
     except Exception as e:
-        error_msg = f"呼叫 Cantonese.ai 發生異常: {str(e)}"
-        print(error_msg)
-        return jsonify({"audio_url": None, "error": error_msg}), 200
+        return jsonify({"audio_url": None, "error": f"呼叫 Cantonese.ai 發生異常: {str(e)}"}), 200
 
 
 if __name__ == "__main__":
