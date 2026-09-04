@@ -9,7 +9,8 @@ import edge_tts
 app = Flask(__name__)
 
 # 初始化 OpenAI 用戶端
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+api_key = os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key) if api_key else None
 
 # 學校詳細資料背景庫
 SCHOOL_INFO = """
@@ -53,9 +54,22 @@ SYSTEM_PROMPT = {
     )
 }
 
+def safe_run_async(coro):
+    """安全地在 Vercel Serverless 環境中執行 asyncio"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    return loop.run_until_complete(coro)
+
 async def generate_cantonese_audio(text: str) -> str:
-    """使用 Edge-TTS 生成香港廣東話（HiuMaan 女性聲音）並轉為 Base64 Data URL"""
-    voice = "zh-HK-HiuMaanNeural"  # 香港廣東話女性語音（屈校長聲音）
+    voice = "zh-HK-HiuMaanNeural"
     communicate = edge_tts.Communicate(text, voice)
     
     audio_bytes = bytearray()
@@ -69,10 +83,11 @@ async def generate_cantonese_audio(text: str) -> str:
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        data = request.get_json() or {}
+        if not os.environ.get("OPENAI_API_KEY"):
+            return jsonify({"detail": "請在 Vercel 設定 OPENAI_API_KEY 環境變數"}), 500
+
+        data = request.get_json(silent=True) or {}
         user_messages = data.get('messages', [])
-        
-        # 組合 System Prompt 與使用者對話紀錄
         messages = [SYSTEM_PROMPT] + user_messages
 
         response = client.chat.completions.create(
@@ -87,24 +102,23 @@ def chat():
 
     except Exception as e:
         print(f"Chat API Error: {str(e)}")
-        return jsonify({"detail": str(e)}), 500
+        return jsonify({"detail": f"Chat 錯誤: {str(e)}"}), 500
 
 @app.route('/api/tts', methods=['POST'])
 def tts():
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         text = data.get('text', '')
 
         if not text:
             return jsonify({"detail": "缺少文字內容"}), 400
 
-        # 執行非同步廣東話語音合成
-        audio_url = asyncio.run(generate_cantonese_audio(text))
+        audio_url = safe_run_async(generate_cantonese_audio(text))
         return jsonify({"audio_url": audio_url})
 
     except Exception as e:
         print(f"TTS API Error: {str(e)}")
-        return jsonify({"detail": str(e)}), 500
+        return jsonify({"detail": f"TTS 語音生成錯誤: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
