@@ -98,21 +98,21 @@ def tts():
         if not CANTONESE_AI_API_KEY:
             return jsonify({"audio_url": None, "error": "Vercel 未能讀取到 CANTONESE_AI_API_KEY 環境變數"}), 500
 
-        headers = {
-            "Authorization": f"Bearer {CANTONESE_AI_API_KEY}",
-            "x-api-key": CANTONESE_AI_API_KEY,
-            "Content-Type": "application/json"
-        }
-
+        # Updated payload for Cantonese.ai with api_key inside the body
         payload = {
-            "text": text
+            "api_key": CANTONESE_AI_API_KEY,
+            "text": text,
+            "output_extension": "mp3"
         }
+        
+        # Updated parameter to voice_id
         if CANTONESE_AI_VOICE:
-            payload["voice"] = CANTONESE_AI_VOICE
+            payload["voice_id"] = CANTONESE_AI_VOICE
 
+        # Updated endpoint URL
         tts_res = requests.post(
-            "https://api.cantonese.ai/v1/tts",
-            headers=headers,
+            "https://cantonese.ai/api/tts",
+            headers={"Content-Type": "application/json"},
             json=payload,
             timeout=10.0
         )
