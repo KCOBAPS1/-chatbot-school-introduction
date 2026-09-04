@@ -317,7 +317,6 @@
     function startApp() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      // 預先載入音訊，解除瀏覽器 Autoplay 限制
       currentAudio.load();
       waitingAudio.load();
 
@@ -411,7 +410,13 @@
           body: JSON.stringify({ messages: chatHistory })
         });
 
-        const chatData = await chatRes.json();
+        const rawChatText = await chatRes.text();
+        let chatData;
+        try {
+          chatData = JSON.parse(rawChatText);
+        } catch (e) {
+          throw new Error(`伺服器回應失敗 (${chatRes.status}): ${rawChatText.substring(0, 80)}...`);
+        }
 
         if (!chatRes.ok || !chatData.text) {
           stopWaitingAudio();
@@ -429,8 +434,15 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: replyText })
           });
-          const ttsData = await ttsRes.json();
-          audioUrl = ttsData.audio_url;
+
+          const rawTtsText = await ttsRes.text();
+          let ttsData;
+          try {
+            ttsData = JSON.parse(rawTtsText);
+            audioUrl = ttsData.audio_url;
+          } catch(e) {
+            console.error("TTS output parsed invalid JSON:", rawTtsText);
+          }
         } catch (e) {
           console.error("TTS Fetch Error:", e);
         }
@@ -450,7 +462,7 @@
       } catch (error) {
         stopWaitingAudio();
         console.error("Fetch error:", error);
-        statusEl.innerText = "網絡請求失敗：" + error.message;
+        statusEl.innerText = "請求失敗：" + error.message;
         clearAudioBadge();
         chatHistory.pop();
       } finally {
