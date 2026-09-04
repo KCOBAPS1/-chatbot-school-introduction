@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>英皇書院同學會小學：余主任</title>
+  <title>英皇書院同學會小學：屈嘉曼校長</title>
   <style>
     * {
       box-sizing: border-box;
@@ -173,6 +173,19 @@
       color: #e0e4ec;
       line-height: 1.5;
     }
+
+    /* 等待時出現的小字書面語字幕區，不干擾整體排版 */
+    .waiting-text-box {
+      display: none;
+      font-size: 12px;
+      color: #a0aec0;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 8px 12px;
+      border-radius: 8px;
+      line-height: 1.4;
+      border-left: 3px solid #34a853;
+      margin-top: 4px;
+    }
     
     .audio-badge {
       display: inline-flex;
@@ -221,13 +234,13 @@
   <div class="app-container">
     <div id="start-overlay" class="start-overlay">
       <h2>歡迎嚟到英皇書院同學會小學！</h2>
-      <button class="btn-start" onclick="startApp()">🏫 開始諮詢余主任</button>
+      <button class="btn-start" onclick="startApp()">🏫 開始諮詢屈嘉曼校長</button>
     </div>
 
     <div class="left-panel">
-      <div class="panel-title">英皇書院同學會小學：余主任</div>
+      <div class="panel-title">英皇書院同學會小學：屈嘉曼校長</div>
       <div class="avatar-container" id="avatar-box">
-        <img src="avatar.png" alt="余主任" onerror="handleAvatarError()">
+        <img src="avatar.png" alt="屈嘉曼校長" onerror="handleAvatarError()">
       </div>
       
       <button class="btn-voice" onclick="startVoiceInput()">🎤 按此語音發問</button>
@@ -238,54 +251,66 @@
       </div>
       
       <div class="status-container">
-        <div id="status" class="status-box">余主任準備好為你介紹英小。</div>
+        <div id="status" class="status-box">屈嘉曼校長準備好為你介紹英小。</div>
+        <div id="waiting-text" class="waiting-text-box"></div>
         <div id="audio-badge-container"></div>
       </div>
     </div>
 
     <div class="right-panel">
       <div class="panel-title">學校諮詢紀錄</div>
-      <div id="chat-history" class="history-box">與余主任的對話紀錄會顯示在此處。</div>
+      <div id="chat-history" class="history-box">與屈嘉曼校長的對話紀錄會顯示在此處。</div>
     </div>
   </div>
 
   <script>
     let chatHistory = [];
     let currentAudio = new Audio();
+    let waitingAudio = new Audio();
     let recognition = null;
     let isRecording = false;
     let silenceTimer = null;
 
     const statusEl = document.getElementById('status');
+    const waitingTextEl = document.getElementById('waiting-text');
     const badgeContainer = document.getElementById('audio-badge-container');
+
+    const WAITING_LIST = [
+      {
+        audio: "Waiting 1.mp3",
+        text: "相信您對英小十分感興趣。本校注重小班教學，只要身在英小，每位學生都能發光發亮。本校的課程設計旨在為學生提供機會，讓他們尋獲屬於自己的舞台。"
+      },
+      {
+        audio: "Waiting 2.mp3",
+        text: "英小深信每位孩子都擁有獨特的天賦與潛能。無論是熱愛學術、鍾情體藝，抑或熱衷於科技發明，學校精心設計的多元課程，正是要為他們搭建專屬舞台，讓每位英小主人翁都能在掌聲與肯定中建立自信，綻放屬於自己的光芒！"
+      },
+      {
+        audio: "Waiting 3.mp3",
+        text: "英小多年來實行小班教學，讓每位孩子都能被看見。特別是在小一過渡期，我們實施「三班主任制」與階梯式適應課程，以堅毅平實的「無花果精神」滋養孩子的品德。在充滿正能量的幸福校園裏，讓他們自信愉快地上學，在溫暖中茁壯成長！"
+      },
+      {
+        audio: "Waiting 4.mp3",
+        text: "面對日新月異的科技時代，英小走在創新教育的最前線，獲教育局指定為「數字教育卓越學校」。我們將抽象知識轉化為生動的探索歷程，由團隊用心引導學生運用編程與人工智能（AI）解決難題，培育具備同理心、批判性思維與未來視野的新一代！"
+      },
+      {
+        audio: "Waiting 5.mp3",
+        text: "在英小，升中是我們極為重視的一環。我們連續七年有超過七成畢業生獲派英文中學，獲派首三志願的比率更高達 98%。亮麗成績的背後，不僅代表學術基礎扎實，更因為我們深信，當孩子找到自信與學習熱情，成功的大門自然會打開！"
+      }
+    ];
 
     function handleAvatarError() {
       const avatarBox = document.getElementById('avatar-box');
       avatarBox.innerHTML = `
         <svg viewBox="0 0 200 240" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <!-- Background -->
           <rect width="200" height="240" fill="#1a1e26"/>
-          <!-- Hair Back -->
-          <path d="M 60 75 Q 100 25 140 75 Z" fill="#2d2d2d"/>
-          <!-- Face -->
+          <path d="M 55 85 Q 100 20 145 85 Z" fill="#2d2d2d"/>
           <ellipse cx="100" cy="95" rx="36" ry="42" fill="#ffd5b5"/>
-          <!-- Hair Front -->
-          <path d="M 62 72 C 75 50 125 50 138 72 C 120 62 80 62 62 72 Z" fill="#2d2d2d"/>
-          <!-- Eyes -->
+          <path d="M 58 75 C 75 45 125 45 142 75 Z" fill="#2d2d2d"/>
           <circle cx="86" cy="92" r="4" fill="#333"/>
           <circle cx="114" cy="92" r="4" fill="#333"/>
-          <!-- Glasses -->
-          <rect x="74" y="83" width="24" height="18" rx="4" fill="none" stroke="#444" stroke-width="3"/>
-          <rect x="102" y="83" width="24" height="18" rx="4" fill="none" stroke="#444" stroke-width="3"/>
-          <line x1="98" y1="91" x2="102" y2="91" stroke="#444" stroke-width="3"/>
-          <!-- Smile -->
           <path d="M 88 114 Q 100 124 112 114" fill="none" stroke="#e57373" stroke-width="3" stroke-linecap="round"/>
-          <!-- Shirt Collar -->
           <polygon points="100,148 80,132 100,175 120,132" fill="#ffffff"/>
-          <!-- Tie -->
-          <polygon points="100,145 95,152 97,195 100,200 103,195 105,152" fill="#2b5278"/>
-          <!-- Sweater / Suit -->
-          <path d="M 45 240 Q 55 138 82 138 L 100 160 L 118 138 Q 145 138 155 240 Z" fill="#1f293d"/>
+          <path d="M 45 240 Q 55 138 82 138 L 100 160 L 118 138 Q 145 138 155 240 Z" fill="#2b4c7e"/>
         </svg>
       `;
     }
@@ -293,7 +318,7 @@
     function startApp() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      const welcomeText = "你好呀！我係英小嘅余主任。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
+      const welcomeText = "你好呀！我係英小嘅屈嘉曼校長。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
       statusEl.innerText = welcomeText;
       
       playAudio('welcome.mp3', welcomeText, null, null);
@@ -308,6 +333,27 @@
       badgeContainer.innerHTML = '';
     }
 
+    function playWaitingAudio() {
+      stopWaitingAudio(); // 確保無重疊播放
+      const randomIndex = Math.floor(Math.random() * WAITING_LIST.length);
+      const selected = WAITING_LIST[randomIndex];
+
+      waitingAudio.src = selected.audio;
+      waitingTextEl.innerText = "📖 " + selected.text;
+      waitingTextEl.style.display = 'block';
+
+      waitingAudio.play().catch(e => console.warn("Waiting audio autoplay prevented:", e));
+    }
+
+    function stopWaitingAudio() {
+      if (waitingAudio) {
+        waitingAudio.pause();
+        waitingAudio.currentTime = 0;
+      }
+      waitingTextEl.innerText = '';
+      waitingTextEl.style.display = 'none';
+    }
+
     function handleSend() {
       const input = document.getElementById('text-input');
       const text = input.value.trim();
@@ -319,7 +365,7 @@
 
     function addQuestionToHistory(question, answer) {
       const historyBox = document.getElementById('chat-history');
-      if (historyBox.innerHTML.includes('與余主任的對話紀錄會顯示在此處。')) {
+      if (historyBox.innerHTML.includes('與屈嘉曼校長的對話紀錄會顯示在此處。')) {
         historyBox.innerHTML = '';
       }
       const item = document.createElement('div');
@@ -339,13 +385,16 @@
       if (sendBtn) sendBtn.disabled = true;
       if (inputField) inputField.disabled = true;
 
-      statusEl.innerText = "余主任思考緊回答，請稍候...";
+      statusEl.innerText = "屈校長思考緊回答，請稍候...";
       clearAudioBadge();
 
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
       }
+
+      // 開始播放隨機 Waiting 音訊及顯示小字書面語
+      playWaitingAudio();
 
       chatHistory.push({ role: "user", content: trimmedQuery });
 
@@ -359,13 +408,13 @@
         const chatData = await chatRes.json();
 
         if (!chatRes.ok || !chatData.text) {
+          stopWaitingAudio();
           statusEl.innerText = `伺服器錯誤: ${chatData.detail || '無法取得回應'}`;
           chatHistory.pop();
           return;
         }
 
         const replyText = chatData.text;
-        statusEl.innerText = "余主任準備緊回答，請稍候...";
 
         let audioUrl = null;
         try {
@@ -380,6 +429,9 @@
           console.error("TTS Fetch Error:", e);
         }
 
+        // 回應已準備完畢，即時停止 Waiting 音訊與字幕
+        stopWaitingAudio();
+
         if (audioUrl) {
           playAudio(audioUrl, replyText, trimmedQuery, () => {
             chatHistory.push({ role: "assistant", content: replyText });
@@ -391,6 +443,7 @@
         }
 
       } catch (error) {
+        stopWaitingAudio();
         console.error("Fetch error:", error);
         statusEl.innerText = "網絡請求失敗：" + error.message;
         clearAudioBadge();
@@ -412,7 +465,7 @@
         if (studentQuery) {
           addQuestionToHistory(studentQuery, replyText);
         }
-        showAudioBadge("余主任說話中...");
+        showAudioBadge("屈嘉曼校長說話中...");
         if (onSuccess) onSuccess();
       };
 
