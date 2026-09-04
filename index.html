@@ -174,7 +174,6 @@
       line-height: 1.5;
     }
 
-    /* 等待時出現的小字書面語字幕區，不干擾整體排版 */
     .waiting-text-box {
       display: none;
       font-size: 12px;
@@ -277,23 +276,23 @@
 
     const WAITING_LIST = [
       {
-        audio: "waiting 1.mp3",
+        audio: "waiting1.mp3",
         text: "相信您對英小十分感興趣。本校注重小班教學，只要身在英小，每位學生都能發光發亮。本校的課程設計旨在為學生提供機會，讓他們尋獲屬於自己的舞台。"
       },
       {
-        audio: "waiting 2.mp3",
+        audio: "waiting2.mp3",
         text: "英小深信每位孩子都擁有獨特的天賦與潛能。無論是熱愛學術、鍾情體藝，抑或熱衷於科技發明，學校精心設計的多元課程，正是要為他們搭建專屬舞台，讓每位英小主人翁都能在掌聲與肯定中建立自信，綻放屬於自己的光芒！"
       },
       {
-        audio: "waiting 3.mp3",
+        audio: "waiting3.mp3",
         text: "英小多年來實行小班教學，讓每位孩子都能被看見。特別是在小一過渡期，我們實施「三班主任制」與階梯式適應課程，以堅毅平實的「無花果精神」滋養孩子的品德。在充滿正能量的幸福校園裏，讓他們自信愉快地上學，在溫暖中茁壯成長！"
       },
       {
-        audio: "waiting 4.mp3",
+        audio: "waiting4.mp3",
         text: "面對日新月異的科技時代，英小走在創新教育的最前線，獲教育局指定為「數字教育卓越學校」。我們將抽象知識轉化為生動的探索歷程，由團隊用心引導學生運用編程與人工智能（AI）解決難題，培育具備同理心、批判性思維與未來視野的新一代！"
       },
       {
-        audio: "waiting 5.mp3",
+        audio: "waiting5.mp3",
         text: "在英小，升中是我們極為重視的一環。我們連續七年有超過七成畢業生獲派英文中學，獲派首三志願的比率更高達 98%。亮麗成績的背後，不僅代表學術基礎扎實，更因為我們深信，當孩子找到自信與學習熱情，成功的大門自然會打開！"
       }
     ];
@@ -318,7 +317,11 @@
     function startApp() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      const welcomeText = "你好！我是英皇書院同學會小學的屈嘉曼校長。歡迎向我查詢有關英小的任何問題，例如學校設施、升中派位、小一銜接措施等等！";
+      // 預先載入音訊，解除瀏覽器 Autoplay 限制
+      currentAudio.load();
+      waitingAudio.load();
+
+      const welcomeText = "你好呀！我係英小嘅屈嘉曼校長。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
       statusEl.innerText = welcomeText;
       
       playAudio('welcome.mp3', welcomeText, null, null);
@@ -334,15 +337,19 @@
     }
 
     function playWaitingAudio() {
-      stopWaitingAudio(); // 確保無重疊播放
+      stopWaitingAudio();
       const randomIndex = Math.floor(Math.random() * WAITING_LIST.length);
       const selected = WAITING_LIST[randomIndex];
 
-      waitingAudio.src = selected.audio;
+      waitingAudio.src = './' + selected.audio;
+      waitingAudio.load();
       waitingTextEl.innerText = "📖 " + selected.text;
       waitingTextEl.style.display = 'block';
 
-      waitingAudio.play().catch(e => console.warn("Waiting audio autoplay prevented:", e));
+      const p = waitingAudio.play();
+      if (p !== undefined) {
+        p.catch(e => console.warn("等待音訊播放受阻:", e));
+      }
     }
 
     function stopWaitingAudio() {
@@ -393,7 +400,6 @@
         currentAudio.currentTime = 0;
       }
 
-      // 開始播放隨機 Waiting 音訊及顯示小字書面語
       playWaitingAudio();
 
       chatHistory.push({ role: "user", content: trimmedQuery });
@@ -429,7 +435,6 @@
           console.error("TTS Fetch Error:", e);
         }
 
-        // 回應已準備完畢，即時停止 Waiting 音訊與字幕
         stopWaitingAudio();
 
         if (audioUrl) {
