@@ -111,7 +111,7 @@ def tts():
             payload["voice"] = CANTONESE_AI_VOICE
 
         tts_res = requests.post(
-            "https://api.cantonese.ai/v1/tts",
+            ""https://cantonese.ai/api/tts"",
             headers=headers,
             json=payload,
             timeout=10.0
