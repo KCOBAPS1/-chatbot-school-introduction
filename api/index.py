@@ -1,17 +1,18 @@
 import os
 import json
 import re
-import asyncio
 import base64
 import requests
-import edge_tts
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 # 讀取 Vercel 環境變數
-POE_API_KEY = os.environ.get("POE_API_KEY") or os.environ.get("CANTONESE_AI_API_KEY")
+POE_API_KEY = os.environ.get("POE_API_KEY")
 POE_BOT_NAME = os.environ.get("POE_BOT_NAME", "GPT-4o-Mini")
+
+CANTONESE_AI_API_KEY = os.environ.get("CANTONESE_AI_API_KEY")
+CANTONESE_AI_VOICE = os.environ.get("CANTONESE_AI_VOICE")
 
 
 def clean_json_string(raw_str: str) -> str:
@@ -19,19 +20,6 @@ def clean_json_string(raw_str: str) -> str:
     cleaned = re.sub(r"^```(?:json)?\s*", "", raw_str.strip(), flags=re.IGNORECASE)
     cleaned = re.sub(r"\s*```$", "", cleaned)
     return cleaned.strip()
-
-
-async def generate_cantonese_tts_base64(text_to_speak: str) -> str:
-    """使用 Edge TTS 生成廣東話語音，並轉換為 Base64 Data URI"""
-    voice = os.environ.get("CANTONESE_AI_VOICE", "zh-HK-HiuMaanNeural")
-    communicate = edge_tts.Communicate(text_to_speak, voice)
-    audio_bytes = b""
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            audio_bytes += chunk["data"]
-
-    b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
-    return f"data:audio/mp3;base64,{b64_audio}"
 
 
 @app.route('/api/chat', methods=['POST'])
@@ -69,7 +57,7 @@ def chat():
 
         res_data = response.json()
 
-        # 解析 Poe 回傳之內容
+        # 解析 Poe 回傳內容
         raw_text = ""
         if "choices" in res_data and len(res_data["choices"]) > 0:
             raw_text = res_data["choices"][0].get("message", {}).get("content", "")
@@ -110,12 +98,48 @@ def tts():
         if not text:
             return jsonify({"audio_url": None}), 400
 
-        # 在 Vercel 環境下使用 asyncio.run 執行 Edge TTS 生成
-        audio_url = asyncio.run(generate_cantonese_tts_base64(text))
-        return jsonify({"audio_url": audio_url})
+        if not CANTONESE_AI_API_KEY:
+            print("Missing CANTONESE_AI_API_KEY in environment variables.")
+            return jsonify({"audio_url": None, "error": "未設定 CANTONESE_AI_API_KEY"}), 500
+
+        # 呼叫 Cantonese.ai 官方語音生成接口
+        headers = {
+            "Authorization": f"Bearer {CANTONESE_AI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "text": text
+        }
+        if CANTONESE_AI_VOICE:
+            payload["voice"] = CANTONESE_AI_VOICE
+
+        tts_res = requests.post(
+            "https://api.cantonese.ai/v1/tts",
+            headers=headers,
+            json=payload,
+            timeout=8.0
+        )
+
+        if tts_res.status_code != 200:
+            print(f"Cantonese.ai API Error ({tts_res.status_code}): {tts_res.text}")
+            return jsonify({"audio_url": None, "error": tts_res.text}), 500
+
+        # 處理 Cantonese.ai 回傳格式（JSON 或 二進制音訊）
+        content_type = tts_res.headers.get("content-type", "")
+        if "application/json" in content_type:
+            res_json = tts_res.json()
+            audio_url = res_json.get("audio_url") or res_json.get("url")
+            if not audio_url and "audio" in res_json:
+                audio_url = f"data:audio/mp3;base64,{res_json['audio']}"
+            return jsonify({"audio_url": audio_url})
+        else:
+            # 直接回傳音訊檔案時轉為 Base64 供前端播放
+            b64_audio = base64.b64encode(tts_res.content).decode("utf-8")
+            return jsonify({"audio_url": f"data:audio/mp3;base64,{b64_audio}"})
 
     except Exception as e:
-        print("TTS Generation Error:", str(e))
+        print("Cantonese.ai TTS Fetch Error:", str(e))
         return jsonify({"audio_url": None, "error": str(e)}), 500
 
 
