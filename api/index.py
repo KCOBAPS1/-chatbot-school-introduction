@@ -91,63 +91,42 @@ def chat():
         return jsonify({"detail": f"後端處理異常: {str(e)}"}), 500
 
 
-@app.route('/api/tts', methods=['POST'])
-def tts():
+@app.post("/api/tts")
+async def generate_tts(request: TTSRequest):
+    api_key = os.getenv("CANTONESE_AI_API_KEY")
+    voice_id = os.getenv("CANTONESE_AI_VOICE")
+
+    if not api_key or not voice_id:
+        return {"audio_url": None}
+
     try:
-        data = request.get_json(silent=True) or {}
-        text = data.get("text", "").strip()
+        async with httpx.AsyncClient(timeout=35.0) as client:
+            payload = {
+                "api_key": api_key,
+                "text": request.text,
+                "voice_id": voice_id,
+                "output_extension": "mp3"
+            }
 
-        if not text:
-            return jsonify({"audio_url": None, "error": "缺少生成文字"}), 400
+            response = await client.post(
+                "https://cantonese.ai/api/tts",
+                headers={"Content-Type": "application/json"},
+                json=payload
+            )
 
-        if not CANTONESE_AI_API_KEY:
-            return jsonify({"audio_url": None, "error": "Vercel 未能讀取到 CANTONESE_AI_API_KEY 環境變數"}), 500
+            if response.status_code == 200:
+                content_type = response.headers.get("content-type", "")
+                if "application/json" in content_type:
+                    data = response.json()
+                    return {"audio_url": data.get("audio_url")}
+                else:
+                    audio_b64 = base64.b64encode(response.content).decode("utf-8")
+                    return {"audio_url": f"data:audio/mp3;base64,{audio_b64}"}
 
-        headers = {
-            "Authorization": f"Bearer {CANTONESE_AI_API_KEY}",
-            "x-api-key": CANTONESE_AI_API_KEY,
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "text": text
-        }
-        if CANTONESE_AI_VOICE:
-            payload["voice"] = CANTONESE_AI_VOICE
-
-        tts_res = requests.post(
-            "https://api.cantonese.ai/v1/tts",
-            headers=headers,
-            json=payload,
-            timeout=10.0
-        )
-
-        if tts_res.status_code != 200:
-            if "<html" in tts_res.text.lower():
-                error_msg = f"Cantonese.ai 官方伺服器暫時離線/維護中 (HTTP {tts_res.status_code} Cloudflare Error)"
-            else:
-                error_msg = f"Cantonese.ai 伺服器錯誤 ({tts_res.status_code}): {tts_res.text[:100]}"
-            return jsonify({"audio_url": None, "error": error_msg}), 200
-
-        content_type = tts_res.headers.get("content-type", "")
-        
-        if "application/json" in content_type:
-            res_json = tts_res.json()
-            audio_url = res_json.get("audio_url") or res_json.get("url")
-            if not audio_url and "audio" in res_json:
-                audio_url = f"data:audio/mp3;base64,{res_json['audio']}"
-            
-            if not audio_url:
-                return jsonify({"audio_url": None, "error": f"Cantonese.ai 未回傳有效音訊: {res_json}"}), 200
-                
-            return jsonify({"audio_url": audio_url})
-        else:
-            b64_audio = base64.b64encode(tts_res.content).decode("utf-8")
-            return jsonify({"audio_url": f"data:audio/mp3;base64,{b64_audio}"})
+            print(f"Cantonese.ai API Error [{response.status_code}]: {response.text}")
+            return {"audio_url": None}
 
     except Exception as e:
-        return jsonify({"audio_url": None, "error": f"呼叫 Cantonese.ai 發生異常: {str(e)}"}), 200
-
-
-if __name__ == "__main__":
+        print(f"TTS Request Exception: {e}")
+        return {"audio_url": None}
     app.run(port=5000, debug=True)
