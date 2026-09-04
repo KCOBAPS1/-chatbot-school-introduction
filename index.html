@@ -1,588 +1,79 @@
-<!DOCTYPE html>
-<html lang="zh-HK">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>英皇書院同學會小學：屈嘉曼校長</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-      background: #1e222b url('background.png') no-repeat center center fixed;
-      background-size: cover;
-      color: #ffffff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    
-    .app-container {
-      display: flex;
-      gap: 24px;
-      width: 100%;
-      max-width: 1100px;
-      height: 660px;
-      position: relative;
-    }
-    
-    .start-overlay {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(26, 30, 38, 0.96);
-      border-radius: 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-      gap: 24px;
-      text-align: center;
-      padding: 20px;
-    }
-    .start-overlay h2 {
-      font-size: 26px;
-      font-weight: bold;
-      color: #ffffff;
-    }
-    .btn-start {
-      padding: 18px 40px;
-      font-size: 22px;
-      font-weight: bold;
-      background-color: #34a853;
-      color: white;
-      border: none;
-      border-radius: 36px;
-      cursor: pointer;
-      box-shadow: 0 6px 20px rgba(52, 168, 83, 0.4);
-      transition: transform 0.2s, background-color 0.2s;
-    }
-    .btn-start:hover {
-      background-color: #2d9247;
-    }
-    .btn-start:active {
-      transform: scale(0.96);
-    }
+async function sendQueryToBackend(studentQuery) {
+  const trimmedQuery = studentQuery.trim();
+  if (!trimmedQuery) return;
 
-    .left-panel, .right-panel {
-      background-color: rgba(43, 49, 62, 0.94);
-      border-radius: 16px;
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    }
-    
-    .panel-title {
-      font-size: 22px;
-      font-weight: bold;
-      margin-bottom: 18px;
-      color: #ffffff;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-      padding-bottom: 8px;
-    }
-    
-    .avatar-container {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background-color: #1a1e26;
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 18px;
-      padding: 12px;
-    }
-    .avatar-container img, .avatar-container svg {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      object-position: top center;
-    }
-    
-    .btn-voice {
-      width: 100%;
-      padding: 15px;
-      background-color: #34a853;
-      color: #ffffff;
-      border: none;
-      border-radius: 28px;
-      font-size: 18px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 14px;
-      transition: background-color 0.2s, transform 0.1s;
-    }
-    .btn-voice:active {
-      transform: scale(0.98);
-    }
-    
-    .input-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    .input-row input {
-      flex: 1;
-      padding: 12px 16px;
-      background-color: #1e222b;
-      border: 1px solid #3c4250;
-      border-radius: 10px;
-      color: #ffffff;
-      font-size: 16px;
-    }
-    .input-row input:focus {
-      outline: none;
-      border-color: #4285f4;
-    }
-    .input-row button {
-      padding: 12px 24px;
-      background-color: #4285f4;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-    .input-row button:hover {
-      background-color: #3367d6;
-    }
-    .input-row button:disabled {
-      background-color: #555555;
-      cursor: not-allowed;
-    }
-    
-    .status-container {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 50px;
-    }
-    
-    .status-box {
-      font-size: 16px;
-      color: #e0e4ec;
-      line-height: 1.5;
-    }
+  const sendBtn = document.querySelector('.send');
+  const inputField = document.getElementById('text-input');
 
-    .waiting-text-box {
-      display: none;
-      font-size: 12px;
-      color: #a0aec0;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 8px 12px;
-      border-radius: 8px;
-      line-height: 1.4;
-      border-left: 3px solid #34a853;
-      margin-top: 4px;
-    }
-    
-    .audio-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      align-self: flex-start;
-      font-size: 14px;
-      background: rgba(66, 133, 244, 0.2);
-      color: #8ab4f8;
-      border: 1px solid rgba(66, 133, 244, 0.4);
-      padding: 6px 14px;
-      border-radius: 16px;
-      animation: pulse 1.5s infinite ease-in-out;
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 0.6; }
-      50% { opacity: 1.0; }
-      100% { opacity: 0.6; }
-    }
+  if (sendBtn) sendBtn.disabled = true;
+  if (inputField) inputField.disabled = true;
 
-    .history-box {
-      flex: 1;
-      background-color: #1a1e26;
-      border-radius: 12px;
-      padding: 20px;
-      overflow-y: auto;
-      font-size: 16px;
-      color: #d1d5db;
-      line-height: 1.7;
-    }
-    .chat-item {
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #2b313e;
-      color: #ffffff;
-      word-break: break-word;
-    }
-    .chat-item strong {
-      color: #8ab4f8;
-    }
-  </style>
-</head>
-<body>
+  statusEl.innerText = "屈校長思考緊回答，請稍候...";
+  clearAudioBadge();
 
-  <div class="app-container">
-    <div id="start-overlay" class="start-overlay">
-      <h2>歡迎嚟到英皇書院同學會小學！</h2>
-      <button class="btn-start" onclick="startApp()">🏫 開始諮詢屈嘉曼校長</button>
-    </div>
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+  }
 
-    <div class="left-panel">
-      <div class="panel-title">英皇書院同學會小學：屈嘉曼校長</div>
-      <div class="avatar-container" id="avatar-box">
-        <img src="avatar.png" alt="屈嘉曼校長" onerror="handleAvatarError()">
-      </div>
-      
-      <button class="btn-voice" onclick="startVoiceInput()">🎤 按此語音發問</button>
-      
-      <div class="input-row">
-        <input type="text" id="text-input" placeholder="查詢學校特色、課程或升中資訊..." onkeydown="if(event.key==='Enter') handleSend()">
-        <button class="send" onclick="handleSend()">傳送</button>
-      </div>
-      
-      <div class="status-container">
-        <div id="status" class="status-box">屈嘉曼校長準備好為你介紹英小。</div>
-        <div id="waiting-text" class="waiting-text-box"></div>
-        <div id="audio-badge-container"></div>
-      </div>
-    </div>
+  playWaitingAudio();
+  chatHistory.push({ role: "user", content: trimmedQuery });
 
-    <div class="right-panel">
-      <div class="panel-title">學校諮詢紀錄</div>
-      <div id="chat-history" class="history-box">與屈嘉曼校長的對話紀錄會顯示在此處。</div>
-    </div>
-  </div>
+  try {
+    const chatRes = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHistory })
+    });
 
-  <script>
-    let chatHistory = [];
-    let currentAudio = new Audio();
-    let waitingAudio = new Audio();
-    let recognition = null;
-    let isRecording = false;
-    let silenceTimer = null;
+    const chatData = await chatRes.json();
 
-    const statusEl = document.getElementById('status');
-    const waitingTextEl = document.getElementById('waiting-text');
-    const badgeContainer = document.getElementById('audio-badge-container');
-
-    const WAITING_LIST = [
-      {
-        audio: "waiting1.mp3",
-        text: "相信您對英小十分感興趣。本校注重小班教學，只要身在英小，每位學生都能發光發亮。本校的課程設計旨在為學生提供機會，讓他們尋獲屬於自己的舞台。"
-      },
-      {
-        audio: "waiting2.mp3",
-        text: "英小深信每位孩子都擁有獨特的天賦與潛能。無論是熱愛學術、鍾情體藝，抑或熱衷於科技發明，學校精心設計的多元課程，正是要為他們搭建專屬舞台，讓每位英小主人翁都能在掌聲與肯定中建立自信，綻放屬於自己的光芒！"
-      },
-      {
-        audio: "waiting3.mp3",
-        text: "英小多年來實行小班教學，讓每位孩子都能被看見。特別是在小一過渡期，我們實施「三班主任制」與階梯式適應課程，以堅毅平實的「無花果精神」滋養孩子的品德。在充滿正能量的幸福校園裏，讓他們自信愉快地上學，在溫暖中茁壯成長！"
-      },
-      {
-        audio: "waiting4.mp3",
-        text: "面對日新月異的科技時代，英小走在創新教育的最前線，獲教育局指定為「數字教育卓越學校」。我們將抽象知識轉化為生動的探索歷程，由團隊用心引導學生運用編程與人工智能（AI）解決難題，培育具備同理心、批判性思維與未來視野的新一代！"
-      },
-      {
-        audio: "waiting5.mp3",
-        text: "在英小，升中是我們極為重視的一環。我們連續七年有超過七成畢業生獲派英文中學，獲派首三志願的比率更高達 98%。亮麗成績的背後，不僅代表學術基礎扎實，更因為我們深信，當孩子找到自信與學習熱情，成功的大門自然會打開！"
-      }
-    ];
-
-    function handleAvatarError() {
-      const avatarBox = document.getElementById('avatar-box');
-      avatarBox.innerHTML = `
-        <svg viewBox="0 0 200 240" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <rect width="200" height="240" fill="#1a1e26"/>
-          <path d="M 55 85 Q 100 20 145 85 Z" fill="#2d2d2d"/>
-          <ellipse cx="100" cy="95" rx="36" ry="42" fill="#ffd5b5"/>
-          <path d="M 58 75 C 75 45 125 45 142 75 Z" fill="#2d2d2d"/>
-          <circle cx="86" cy="92" r="4" fill="#333"/>
-          <circle cx="114" cy="92" r="4" fill="#333"/>
-          <path d="M 88 114 Q 100 124 112 114" fill="none" stroke="#e57373" stroke-width="3" stroke-linecap="round"/>
-          <polygon points="100,148 80,132 100,175 120,132" fill="#ffffff"/>
-          <path d="M 45 240 Q 55 138 82 138 L 100 160 L 118 138 Q 145 138 155 240 Z" fill="#2b4c7e"/>
-        </svg>
-      `;
-    }
-
-    function startApp() {
-      document.getElementById('start-overlay').style.display = 'none';
-
-      currentAudio.load();
-      waitingAudio.load();
-
-      const welcomeText = "你好呀！我係英小嘅屈嘉曼校長。歡迎查詢英皇書院同學會小學嘅學校資訊，請問有咩可以幫到你？";
-      statusEl.innerText = welcomeText;
-      
-      playAudio('welcome.mp3', welcomeText, null, null);
-      chatHistory.push({ role: "assistant", content: welcomeText });
-    }
-
-    function showAudioBadge(text) {
-      badgeContainer.innerHTML = `<span class="audio-badge">🔊 ${text}</span>`;
-    }
-
-    function clearAudioBadge() {
-      badgeContainer.innerHTML = '';
-    }
-
-    function playWaitingAudio() {
+    if (!chatRes.ok || !chatData.text) {
       stopWaitingAudio();
-      const randomIndex = Math.floor(Math.random() * WAITING_LIST.length);
-      const selected = WAITING_LIST[randomIndex];
-
-      waitingAudio.src = './' + selected.audio;
-      waitingAudio.load();
-      waitingTextEl.innerText = "📖 " + selected.text;
-      waitingTextEl.style.display = 'block';
-
-      const p = waitingAudio.play();
-      if (p !== undefined) {
-        p.catch(e => console.warn("等待音訊播放受阻:", e));
-      }
+      statusEl.innerText = `伺服器錯誤: ${chatData.detail || '無法取得回應'}`;
+      chatHistory.pop();
+      return;
     }
 
-    function stopWaitingAudio() {
-      if (waitingAudio) {
-        waitingAudio.pause();
-        waitingAudio.currentTime = 0;
-      }
-      waitingTextEl.innerText = '';
-      waitingTextEl.style.display = 'none';
-    }
+    const displayText = chatData.text;    // 繁體書面語（用於顯示）
+    const spokenText = chatData.speech;   // 廣東話口語（用於語音）
 
-    function handleSend() {
-      const input = document.getElementById('text-input');
-      const text = input.value.trim();
-      if (text) {
-        input.value = '';
-        sendQueryToBackend(text);
-      }
-    }
-
-    function addQuestionToHistory(question, answer) {
-      const historyBox = document.getElementById('chat-history');
-      if (historyBox.innerHTML.includes('與屈嘉曼校長的對話紀錄會顯示在此處。')) {
-        historyBox.innerHTML = '';
-      }
-      const item = document.createElement('div');
-      item.className = 'chat-item';
-      item.innerHTML = `<strong>問：</strong>${question}<br><strong>答：</strong>${answer}`;
-      historyBox.appendChild(item);
-      historyBox.scrollTop = historyBox.scrollHeight;
-    }
-
-    async function sendQueryToBackend(studentQuery) {
-      const trimmedQuery = studentQuery.trim();
-      if (!trimmedQuery) return;
-
-      const sendBtn = document.querySelector('.send');
-      const inputField = document.getElementById('text-input');
-
-      if (sendBtn) sendBtn.disabled = true;
-      if (inputField) inputField.disabled = true;
-
-      statusEl.innerText = "屈校長思考緊回答，請稍候...";
-      clearAudioBadge();
-
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-
-      playWaitingAudio();
-
-      chatHistory.push({ role: "user", content: trimmedQuery });
-
-      try {
-        const chatRes = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: chatHistory })
-        });
-
-        const rawChatText = await chatRes.text();
-        let chatData;
-        try {
-          chatData = JSON.parse(rawChatText);
-        } catch (e) {
-          throw new Error(`伺服器回應失敗 (${chatRes.status}): ${rawChatText.substring(0, 80)}...`);
-        }
-
-        if (!chatRes.ok || !chatData.text) {
-          stopWaitingAudio();
-          statusEl.innerText = `伺服器錯誤: ${chatData.detail || '無法取得回應'}`;
-          chatHistory.pop();
-          return;
-        }
-
-        const replyText = chatData.text;
-
-        let audioUrl = null;
-        try {
-          const ttsRes = await fetch('/api/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: replyText })
-          });
-
-          const rawTtsText = await ttsRes.text();
-          let ttsData;
-          try {
-            ttsData = JSON.parse(rawTtsText);
-            audioUrl = ttsData.audio_url;
-          } catch(e) {
-            console.error("TTS output parsed invalid JSON:", rawTtsText);
-          }
-        } catch (e) {
-          console.error("TTS Fetch Error:", e);
-        }
-
-        stopWaitingAudio();
-
-        if (audioUrl) {
-          playAudio(audioUrl, replyText, trimmedQuery, () => {
-            chatHistory.push({ role: "assistant", content: replyText });
-          });
-        } else {
-          statusEl.innerText = replyText;
-          addQuestionToHistory(trimmedQuery, replyText);
-          chatHistory.push({ role: "assistant", content: replyText });
-        }
-
-      } catch (error) {
-        stopWaitingAudio();
-        console.error("Fetch error:", error);
-        statusEl.innerText = "請求失敗：" + error.message;
-        clearAudioBadge();
-        chatHistory.pop();
-      } finally {
-        if (sendBtn) sendBtn.disabled = false;
-        if (inputField) {
-          inputField.disabled = false;
-          inputField.focus();
-        }
-      }
-    }
-
-    function playAudio(audioUrl, replyText, studentQuery, onSuccess) {
-      currentAudio.src = audioUrl;
-
-      currentAudio.onplay = () => {
-        statusEl.innerText = replyText;
-        if (studentQuery) {
-          addQuestionToHistory(studentQuery, replyText);
-        }
-        showAudioBadge("屈嘉曼校長說話中...");
-        if (onSuccess) onSuccess();
-      };
-
-      currentAudio.onended = () => {
-        clearAudioBadge();
-      };
-
-      currentAudio.onerror = () => {
-        statusEl.innerText = replyText;
-        if (studentQuery) addQuestionToHistory(studentQuery, replyText);
-        clearAudioBadge();
-        console.warn("Audio file missing or failed to play:", audioUrl);
-      };
-
-      currentAudio.play().catch(e => {
-        console.warn("Autoplay blocked or failed:", e);
-        statusEl.innerText = replyText;
-        if (studentQuery) addQuestionToHistory(studentQuery, replyText);
+    let audioUrl = null;
+    try {
+      const ttsRes = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: spokenText }) // 將廣東話口語傳給 TTS
       });
+      const ttsData = await ttsRes.json();
+      audioUrl = ttsData.audio_url;
+    } catch (e) {
+      console.error("TTS Fetch Error:", e);
     }
 
-    function startVoiceInput() {
-      const btn = document.querySelector('.btn-voice');
-      const input = document.getElementById('text-input');
+    stopWaitingAudio();
 
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        alert('你的瀏覽器不支援語音辨識功能。');
-        return;
-      }
-
-      if (isRecording) {
-        if (silenceTimer) clearTimeout(silenceTimer);
-        if (recognition) recognition.stop();
-        return;
-      }
-
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.lang = 'zh-HK';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      isRecording = true;
-      btn.innerText = "🔴 錄音中... (點擊完成發問)";
-      btn.style.backgroundColor = "#e53935";
-      statusEl.innerText = "正在聆聽中，請說出你的問題...";
-      input.value = "";
-
-      let finalTranscript = "";
-
-      recognition.onresult = (event) => {
-        let interimTranscript = "";
-
-        if (silenceTimer) clearTimeout(silenceTimer);
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-
-        const currentText = finalTranscript || interimTranscript;
-        input.value = currentText;
-        statusEl.innerText = "聽緊你講： " + currentText;
-
-        silenceTimer = setTimeout(() => {
-          if (recognition && isRecording) {
-            recognition.stop();
-          }
-        }, 1800);
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        statusEl.innerText = "語音辨識失敗，請重試。";
-        resetVoiceButton();
-      };
-
-      recognition.onend = () => {
-        resetVoiceButton();
-        const textToSend = input.value.trim();
-        if (textToSend) {
-          handleSend();
-        }
-      };
-
-      recognition.start();
+    if (audioUrl) {
+      playAudio(audioUrl, displayText, trimmedQuery, () => {
+        chatHistory.push({ role: "assistant", content: displayText });
+      });
+    } else {
+      statusEl.innerText = displayText;
+      addQuestionToHistory(trimmedQuery, displayText);
+      chatHistory.push({ role: "assistant", content: displayText });
     }
 
-    function resetVoiceButton() {
-      isRecording = false;
-      if (silenceTimer) clearTimeout(silenceTimer);
-      const btn = document.querySelector('.btn-voice');
-      if (btn) {
-        btn.innerText = "🎤 按此語音發問";
-        btn.style.backgroundColor = "#34a853";
-      }
+  } catch (error) {
+    stopWaitingAudio();
+    console.error("Fetch error:", error);
+    statusEl.innerText = "請求失敗：" + error.message;
+    clearAudioBadge();
+    chatHistory.pop();
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+    if (inputField) {
+      inputField.disabled = false;
+      inputField.focus();
     }
-  </script>
-</body>
-</html>
+  }
+}
