@@ -4,10 +4,15 @@ import re
 import base64
 import requests
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
-# 讀取 Vercel 環境變數
+@app.route('/')
+def home():
+    return "英小屈嘉曼校長 Chatbot API 運作正常！"
+
 POE_API_KEY = os.environ.get("POE_API_KEY", "").strip()
 POE_BOT_NAME = os.environ.get("POE_BOT_NAME", "GPT-4o-Mini").strip()
 
@@ -111,13 +116,12 @@ def tts():
             payload["voice"] = CANTONESE_AI_VOICE
 
         tts_res = requests.post(
-            ""https://cantonese.ai/api/tts"",
+            "https://api.cantonese.ai/v1/tts",
             headers=headers,
             json=payload,
             timeout=10.0
         )
 
-        # 處理非 200 狀態碼（例如 530 Cloudflare Tunnel Error）
         if tts_res.status_code != 200:
             if "<html" in tts_res.text.lower():
                 error_msg = f"Cantonese.ai 官方伺服器暫時離線/維護中 (HTTP {tts_res.status_code} Cloudflare Error)"
@@ -127,7 +131,6 @@ def tts():
 
         content_type = tts_res.headers.get("content-type", "")
         
-        # 處理 JSON 格式回傳
         if "application/json" in content_type:
             res_json = tts_res.json()
             audio_url = res_json.get("audio_url") or res_json.get("url")
@@ -139,7 +142,6 @@ def tts():
                 
             return jsonify({"audio_url": audio_url})
         else:
-            # 處理二進制音訊檔回傳
             b64_audio = base64.b64encode(tts_res.content).decode("utf-8")
             return jsonify({"audio_url": f"data:audio/mp3;base64,{b64_audio}"})
 
