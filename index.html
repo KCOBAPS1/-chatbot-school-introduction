@@ -449,7 +449,6 @@
             chatHistory.push({ role: "assistant", content: displayText });
           });
         } else {
-          // Cantonese.ai 斷線時，自動切換至系統內建廣東話語音發音
           statusEl.innerText = displayText;
           addQuestionToHistory(trimmedQuery, displayText);
           chatHistory.push({ role: "assistant", content: displayText });
@@ -471,7 +470,6 @@
       }
     }
 
-    // 備援語音發音 (Web Speech API zh-HK)
     function speakFallbackSystemTTS(text) {
       if (!('speechSynthesis' in window)) return;
 
@@ -511,7 +509,6 @@
       };
 
       currentAudio.onerror = () => {
-        // 音訊無法播放時切換至系統發音
         statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
         clearAudioBadge();
