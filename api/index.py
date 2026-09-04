@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 
-app = FastAPI(title="英皇書院同學會小學 余主任 Chatbot API")
+app = FastAPI(title="英皇書院同學會小學 屈嘉曼校長 Chatbot API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,7 +55,7 @@ for path in possible_paths:
 SYSTEM_PROMPT = {
     "role": "system",
     "content": (
-        "你係英皇書院同學會小學嘅「余主任」。\n\n"
+        "你係英皇書院同學會小學嘅現任校長「屈嘉曼校長」。\n\n"
         "【核心校舍資料（必須完全準確）】\n"
         "1. 本校名稱：英皇書院同學會小學（英文：King's College Old Boys' Association Primary School）\n"
         "2. 本校地址：香港上環必列者士街58號\n"
@@ -66,7 +66,7 @@ SYSTEM_PROMPT = {
         "2. 嚴禁輸出任何網址、https 連結、Markdown 超連結或「Learn more」區域。\n"
         "3. 如被問及學校網址，請只講出簡短域名「kcobaps1.edu.hk」。\n"
         "4. 你只可以回答與「英皇書院同學會小學」相關嘅問題（例如地址、交通、特色、課程、升中、校園生活）。\n"
-        "5. 如問題與本校無關，請禮貌拒絕：「我係英小嘅余主任，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n"
+        "5. 如問題與本校無關，請禮貌拒絕：「我係英小嘅屈嘉曼校長，我只可以解答與英皇書院同學會小學相關嘅查詢。請問有咩關於英小嘅問題想了解？」\n"
         "6. 請使用親切、專業同禮貌嘅廣東話（繁體中文）回答。\n\n"
         f"【補充資料檔案】\n{SCHOOL_INFO}"
     )
@@ -78,7 +78,6 @@ async def chat(request: ChatRequest):
     if not poe_api_key:
         raise HTTPException(status_code=500, detail="POE_API_KEY 未設定，請至 Vercel 設定環境變數 POE_API_KEY")
 
-    # 預設 Bot 名稱更新為你的實際 Bot 代號
     poe_bot_handle = os.getenv("POE_BOT_NAME", "schoolcbcollectdata")
 
     formatted_messages = [SYSTEM_PROMPT]
@@ -90,7 +89,6 @@ async def chat(request: ChatRequest):
 
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
-            # 1. 呼叫 Poe API
             response = await client.post(
                 "https://api.poe.com/v1/chat/completions",
                 headers={
@@ -108,9 +106,8 @@ async def chat(request: ChatRequest):
                 data = response.json()
                 raw_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                 cleaned = clean_response(raw_text)
-                return {"text": cleaned or raw_text or "余主任收到你的查詢，請稍後重試。"}
+                return {"text": cleaned or raw_text or "屈校長收到你的查詢，請稍後重試。"}
 
-            # 2. Poe 失敗時嘗試 OpenAI 備用
             openai_response = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
@@ -128,9 +125,8 @@ async def chat(request: ChatRequest):
                 data = openai_response.json()
                 raw_text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                 cleaned = clean_response(raw_text)
-                return {"text": cleaned or raw_text or "余主任收到你的查詢，請稍後重試。"}
+                return {"text": cleaned or raw_text or "屈校長收到你的查詢，請稍後重試。"}
 
-            # 若兩者皆失敗，回傳完整錯誤狀態與內文
             raise HTTPException(
                 status_code=response.status_code,
                 detail=f"API 請求失敗 [{response.status_code}]: {response.text}"
