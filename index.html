@@ -381,31 +381,6 @@
       historyBox.scrollTop = historyBox.scrollHeight;
     }
 
-    // 瀏覽器廣東話語音備用播放器 (Fallback)
-    function speakCantoneseFallback(text, onEndCallback) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'zh-HK';
-        utterance.rate = 0.95;
-        
-        utterance.onstart = () => {
-          showAudioBadge("屈嘉曼校長說話中...");
-        };
-        utterance.onend = () => {
-          clearAudioBadge();
-          if (onEndCallback) onEndCallback();
-        };
-        utterance.onerror = () => {
-          clearAudioBadge();
-          if (onEndCallback) onEndCallback();
-        };
-        window.speechSynthesis.speak(utterance);
-      } else {
-        if (onEndCallback) onEndCallback();
-      }
-    }
-
     async function sendQueryToBackend(studentQuery) {
       const trimmedQuery = studentQuery.trim();
       if (!trimmedQuery) return;
@@ -434,13 +409,7 @@
           body: JSON.stringify({ messages: chatHistory })
         });
 
-        const rawChatText = await chatRes.text();
-        let chatData;
-        try {
-          chatData = JSON.parse(rawChatText);
-        } catch (e) {
-          throw new Error(`伺服器回應失敗 (${chatRes.status}): ${rawChatText.substring(0, 80)}...`);
-        }
+        const chatData = await chatRes.json();
 
         if (!chatRes.ok || !chatData.text) {
           stopWaitingAudio();
@@ -453,6 +422,8 @@
         const spokenText = chatData.speech || chatData.text;
 
         let audioUrl = null;
+        let ttsError = null;
+
         try {
           const ttsRes = await fetch('/api/tts', {
             method: 'POST',
@@ -460,16 +431,11 @@
             body: JSON.stringify({ text: spokenText })
           });
 
-          const rawTtsText = await ttsRes.text();
-          let ttsData;
-          try {
-            ttsData = JSON.parse(rawTtsText);
-            audioUrl = ttsData.audio_url;
-          } catch(e) {
-            console.error("TTS output parsed invalid JSON:", rawTtsText);
-          }
+          const ttsData = await ttsRes.json();
+          audioUrl = ttsData.audio_url;
+          ttsError = ttsData.error;
         } catch (e) {
-          console.error("TTS Fetch Error:", e);
+          ttsError = e.message;
         }
 
         stopWaitingAudio();
@@ -479,11 +445,10 @@
             chatHistory.push({ role: "assistant", content: displayText });
           });
         } else {
-          // 後端 TTS 失敗時自動啟動瀏覽器廣東話發聲
-          statusEl.innerText = displayText;
+          // 若 Cantonese.ai 呼叫失敗，直接在文字區顯示報錯細節，方便即時排查 Key 或 Voice 問題
+          statusEl.innerText = `${displayText}\n\n⚠️ Cantonese.ai 語音無法播放：${ttsError || '未知錯誤'}`;
           addQuestionToHistory(trimmedQuery, displayText);
           chatHistory.push({ role: "assistant", content: displayText });
-          speakCantoneseFallback(spokenText);
         }
 
       } catch (error) {
@@ -518,18 +483,15 @@
       };
 
       currentAudio.onerror = () => {
-        statusEl.innerText = replyText;
+        statusEl.innerText = `${replyText}\n\n⚠️ 語音檔播放失敗 (音訊格式不相容或已被阻擋)`;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
         clearAudioBadge();
-        console.warn("Audio file missing or failed to play, switching to fallback TTS.");
-        speakCantoneseFallback(replyText);
       };
 
       currentAudio.play().catch(e => {
-        console.warn("Autoplay blocked or failed, switching to fallback TTS:", e);
+        console.warn("Autoplay blocked:", e);
         statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
-        speakCantoneseFallback(replyText);
       });
     }
 
