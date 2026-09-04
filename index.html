@@ -381,6 +381,31 @@
       historyBox.scrollTop = historyBox.scrollHeight;
     }
 
+    // 瀏覽器廣東話語音備用播放器 (Fallback)
+    function speakCantoneseFallback(text, onEndCallback) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-HK';
+        utterance.rate = 0.95;
+        
+        utterance.onstart = () => {
+          showAudioBadge("屈嘉曼校長說話中...");
+        };
+        utterance.onend = () => {
+          clearAudioBadge();
+          if (onEndCallback) onEndCallback();
+        };
+        utterance.onerror = () => {
+          clearAudioBadge();
+          if (onEndCallback) onEndCallback();
+        };
+        window.speechSynthesis.speak(utterance);
+      } else {
+        if (onEndCallback) onEndCallback();
+      }
+    }
+
     async function sendQueryToBackend(studentQuery) {
       const trimmedQuery = studentQuery.trim();
       if (!trimmedQuery) return;
@@ -400,7 +425,6 @@
       }
 
       playWaitingAudio();
-
       chatHistory.push({ role: "user", content: trimmedQuery });
 
       try {
@@ -425,8 +449,8 @@
           return;
         }
 
-        const displayText = chatData.text;                 // 繁體書面語（用於顯示）
-        const spokenText = chatData.speech || chatData.text; // 廣東話口語（用於語音）
+        const displayText = chatData.text;
+        const spokenText = chatData.speech || chatData.text;
 
         let audioUrl = null;
         try {
@@ -455,9 +479,11 @@
             chatHistory.push({ role: "assistant", content: displayText });
           });
         } else {
+          // 後端 TTS 失敗時自動啟動瀏覽器廣東話發聲
           statusEl.innerText = displayText;
           addQuestionToHistory(trimmedQuery, displayText);
           chatHistory.push({ role: "assistant", content: displayText });
+          speakCantoneseFallback(spokenText);
         }
 
       } catch (error) {
@@ -495,13 +521,15 @@
         statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
         clearAudioBadge();
-        console.warn("Audio file missing or failed to play:", audioUrl);
+        console.warn("Audio file missing or failed to play, switching to fallback TTS.");
+        speakCantoneseFallback(replyText);
       };
 
       currentAudio.play().catch(e => {
-        console.warn("Autoplay blocked or failed:", e);
+        console.warn("Autoplay blocked or failed, switching to fallback TTS:", e);
         statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
+        speakCantoneseFallback(replyText);
       });
     }
 
