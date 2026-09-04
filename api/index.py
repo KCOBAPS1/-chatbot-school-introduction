@@ -9,20 +9,20 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Fetch environment variables set in Vercel
+# 讀取 Vercel 環境變數
 POE_API_KEY = os.environ.get("POE_API_KEY") or os.environ.get("CANTONESE_AI_API_KEY")
 POE_BOT_NAME = os.environ.get("POE_BOT_NAME", "GPT-4o-Mini")
 
 
 def clean_json_string(raw_str: str) -> str:
-    """Removes Markdown codeblock formatting like ```json ... ``` if present."""
+    """清除 Poe 可能附帶的 ```json ... ``` Markdown 標記"""
     cleaned = re.sub(r"^```(?:json)?\s*", "", raw_str.strip(), flags=re.IGNORECASE)
     cleaned = re.sub(r"\s*```$", "", cleaned)
     return cleaned.strip()
 
 
 async def generate_cantonese_tts_base64(text_to_speak: str) -> str:
-    """Generates Cantonese TTS audio using Edge TTS and returns a Base64 data URI."""
+    """使用 Edge TTS 生成廣東話語音，並轉換為 Base64 Data URI"""
     voice = os.environ.get("CANTONESE_AI_VOICE", "zh-HK-HiuMaanNeural")
     communicate = edge_tts.Communicate(text_to_speak, voice)
     audio_bytes = b""
@@ -46,7 +46,7 @@ def chat():
         if not POE_API_KEY:
             return jsonify({"detail": "Vercel 未設定 POE_API_KEY 環境變數"}), 500
 
-        # Call Poe API via OpenAI-compatible endpoint
+        # 呼叫 Poe 相容接口
         headers = {
             "Authorization": f"Bearer {POE_API_KEY}",
             "Content-Type": "application/json"
@@ -69,17 +69,17 @@ def chat():
 
         res_data = response.json()
 
-        # Extract text response from Poe response format
+        # 解析 Poe 回傳之內容
         raw_text = ""
         if "choices" in res_data and len(res_data["choices"]) > 0:
             raw_text = res_data["choices"][0].get("message", {}).get("content", "")
         elif "text" in res_data:
             raw_text = res_data["text"]
 
-        # Parse JSON output (text and speech) from bot
         display_text = raw_text
         spoken_text = raw_text
 
+        # 嘗試解開雙語 JSON (text 與 speech)
         try:
             cleaned_text = clean_json_string(raw_text)
             parsed = json.loads(cleaned_text)
@@ -87,7 +87,6 @@ def chat():
                 display_text = parsed.get("text", raw_text)
                 spoken_text = parsed.get("speech", display_text)
         except Exception:
-            # Fallback if bot didn't output structured JSON
             display_text = raw_text
             spoken_text = raw_text
 
@@ -111,14 +110,8 @@ def tts():
         if not text:
             return jsonify({"audio_url": None}), 400
 
-        # Execute async Edge TTS generator inside synchronous Flask route
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            audio_url = loop.run_until_complete(generate_cantonese_tts_base64(text))
-        finally:
-            loop.close()
-
+        # 在 Vercel 環境下使用 asyncio.run 執行 Edge TTS 生成
+        audio_url = asyncio.run(generate_cantonese_tts_base64(text))
         return jsonify({"audio_url": audio_url})
 
     except Exception as e:
