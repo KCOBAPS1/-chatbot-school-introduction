@@ -240,7 +240,7 @@
     <div class="left-panel">
       <div class="panel-title">英皇書院同學會小學：屈嘉曼校長</div>
       <div class="avatar-container" id="avatar-box">
-        <img src="avatar.png" alt="屈嘉曼校長" onerror="handleAvatarError()">
+        <img id="avatar-img" src="avatar.png" alt="屈嘉曼校長" onerror="handleAvatarError()">
       </div>
       
       <button class="btn-voice" onclick="startVoiceInput()">🎤 按此語音發問</button>
@@ -298,6 +298,15 @@
       }
     ];
 
+    // 【新增】控制頭像切換的函數
+    function toggleAvatarAnimation(isSpeaking) {
+      const avatarImg = document.getElementById('avatar-img');
+      if (avatarImg) {
+        // 使用者上傳嘅檔案名，如果真係改名可以喺呢度轉
+        avatarImg.src = isSpeaking ? 'speaking gif.gif' : 'avatar.png';
+      }
+    }
+
     function handleAvatarError() {
       const avatarBox = document.getElementById('avatar-box');
       avatarBox.innerHTML = `
@@ -346,6 +355,11 @@
       waitingTextEl.innerText = "📖 " + selected.text;
       waitingTextEl.style.display = 'block';
 
+      // 【新增】等待語音播放時亦當作「說話中」處理
+      waitingAudio.onplay = () => toggleAvatarAnimation(true);
+      waitingAudio.onended = () => toggleAvatarAnimation(false);
+      waitingAudio.onerror = () => toggleAvatarAnimation(false);
+
       const p = waitingAudio.play();
       if (p !== undefined) {
         p.catch(e => console.warn("等待音訊播放受阻:", e));
@@ -356,6 +370,7 @@
       if (waitingAudio) {
         waitingAudio.pause();
         waitingAudio.currentTime = 0;
+        toggleAvatarAnimation(false); // 【新增】停止時轉回靜態頭像
       }
       waitingTextEl.innerText = '';
       waitingTextEl.style.display = 'none';
@@ -398,6 +413,7 @@
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
+        toggleAvatarAnimation(false); // 【新增】打斷語音時變回靜態頭像
       }
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -479,14 +495,17 @@
 
       utterance.onstart = () => {
         showAudioBadge("屈嘉曼校長說話中 (系統備援語音)...");
+        toggleAvatarAnimation(true); // 【新增】系統後備語音講話時顯示 GIF
       };
 
       utterance.onend = () => {
         clearAudioBadge();
+        toggleAvatarAnimation(false); // 【新增】
       };
 
       utterance.onerror = () => {
         clearAudioBadge();
+        toggleAvatarAnimation(false); // 【新增】
       };
 
       window.speechSynthesis.speak(utterance);
@@ -501,17 +520,20 @@
           addQuestionToHistory(studentQuery, replyText);
         }
         showAudioBadge("屈嘉曼校長說話中...");
+        toggleAvatarAnimation(true); // 【新增】Cantonese AI 播放時顯示 GIF
         if (onSuccess) onSuccess();
       };
 
       currentAudio.onended = () => {
         clearAudioBadge();
+        toggleAvatarAnimation(false); // 【新增】
       };
 
       currentAudio.onerror = () => {
         statusEl.innerText = replyText;
         if (studentQuery) addQuestionToHistory(studentQuery, replyText);
         clearAudioBadge();
+        toggleAvatarAnimation(false); // 【新增】
         speakFallbackSystemTTS(replyText);
       };
 
